@@ -46,12 +46,10 @@ parser = argparse.ArgumentParser(
     description="Fit EDGS model to a scene, optionally from a video."
 )
 parser.add_argument(
-    "--video_path",
+    "--input_path",
     type=str,
-    default=os.path.join(
-        project_root, "assets", "examples", "video_fruits.mp4"
-    ),  # Use project_root
-    help="Path to the input video file.",
+    default=os.path.join(project_root, "assets", "examples", "video_fruits.mp4"),
+    help="Path to the input video file or directory containing input/ and optionally depth/.",
 )
 parser.add_argument(
     "--outputs_dir",
@@ -87,19 +85,18 @@ print(OmegaConf.to_yaml(cfg))
 
 # ## 3.1 Optionally preprocess video
 # process the input video
-if os.path.exists(args.video_path):
-    print(f"Starting video processing for: {args.video_path}")
+if os.path.isfile(args.input_path):
+    # Video file case
+    print(f"Starting video processing for: {args.input_path}")
     try:
-        # The first return value 'images_data' might not be directly used by the trainer
-        # if the Scene object loads everything from the COLMAP directory.
         _, scene_dir = orchestrate_video_to_colmap_scene(
-            args.video_path,
-            cfg.init_wC.num_refs,  # Assuming you added this arg
-            max_size=1024,  # Or make it an arg
-            base_work_dir=args.outputs_dir,  # Assuming you added this arg
+            args.input_path,
+            cfg.init_wC.num_refs,
+            max_size=1024,
+            base_work_dir=args.outputs_dir,
         )
         if scene_dir is None:
-            print(f"Failed to process video {args.video_path}. Exiting.")
+            print(f"Failed to process video {args.input_path}. Exiting.")
             sys.exit(1)
         cfg.gs.dataset.source_path = scene_dir
         cfg.gs.dataset.model_path = os.path.join(scene_dir, "models")
@@ -108,6 +105,26 @@ if os.path.exists(args.video_path):
     except Exception as e:
         print(f"Error during video preprocessing: {e}")
         sys.exit(1)
+elif os.path.isdir(args.input_path):
+    # Directory case
+    input_dir = os.path.join(args.input_path, "input")
+    depth_dir = os.path.join(args.input_path, "depth")
+    if not os.path.isdir(input_dir):
+        print(f"Error: Expected 'input/' subdirectory in {args.input_path}")
+        sys.exit(1)
+    cfg.gs.dataset.source_path = input_dir
+    if os.path.isdir(depth_dir):
+        cfg.gs.dataset.depth_path = depth_dir
+        print(f"Found depth maps in: {depth_dir}")
+    else:
+        cfg.gs.dataset.depth_path = None
+        print("No depth maps found; proceeding with RGB only.")
+    # Set model path
+    cfg.gs.dataset.model_path = os.path.join(args.outputs_dir, "models")
+    os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
+else:
+    print(f"Error: {args.input_path} is neither a file nor a directory.")
+    sys.exit(1)
 
 
 # # 4. Initilize model and logger
