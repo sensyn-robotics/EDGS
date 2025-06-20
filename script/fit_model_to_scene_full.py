@@ -87,6 +87,10 @@ print(OmegaConf.to_yaml(cfg))
 # process the input video
 if os.path.isfile(args.input_path):
     # Video file case
+    if getattr(cfg.gs.dataset, "depths", {}).get("enabled"):
+        raise RuntimeError(
+            "Depth maps are not supported for video input. Please set cfg.gs.dataset.depths.enabled to False or use directory input with depth/ subdirectory."
+        )
     print(f"Starting video processing for: {args.input_path}")
     try:
         _, scene_dir = orchestrate_video_to_colmap_scene(
@@ -100,6 +104,7 @@ if os.path.isfile(args.input_path):
             sys.exit(1)
         cfg.gs.dataset.source_path = scene_dir
         cfg.gs.dataset.model_path = os.path.join(scene_dir, "models")
+        cfg.gs.dataset.depths = ""
         print(f"Set model_path to: {cfg.gs.dataset.model_path}")
         os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
     except Exception as e:
