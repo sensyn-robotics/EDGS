@@ -84,51 +84,25 @@ print(OmegaConf.to_yaml(cfg))
 # # 3. Init input parameters
 
 # ## 3.1 Optionally preprocess video
-# process the input video
-if os.path.isfile(args.input_path):
-    # Video file case
-    if getattr(cfg.gs.dataset, "depths", {}).get("enabled"):
-        raise RuntimeError(
-            "Depth maps are not supported for video input. Please set cfg.gs.dataset.depths.enabled to False or use directory input with depth/ subdirectory."
-        )
-    print(f"Starting video processing for: {args.input_path}")
-    try:
-        _, scene_dir = orchestrate_video_to_colmap_scene(
-            args.input_path,
-            cfg.init_wC.num_refs,
-            max_size=1024,
-            base_work_dir=args.outputs_dir,
-        )
-        if scene_dir is None:
-            print(f"Failed to process video {args.input_path}. Exiting.")
-            sys.exit(1)
-        cfg.gs.dataset.source_path = scene_dir
-        cfg.gs.dataset.model_path = os.path.join(scene_dir, "models")
-        cfg.gs.dataset.depths = ""
-        print(f"Set model_path to: {cfg.gs.dataset.model_path}")
-        os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
-    except Exception as e:
-        print(f"Error during video preprocessing: {e}")
+# process the input video/directory.
+print(f"Starting processing for: {args.input_path}")
+try:
+    _, scene_dir = orchestrate_video_to_colmap_scene(
+        args.input_path,
+        cfg.init_wC.num_refs,
+        max_size=1024,
+        base_work_dir=args.outputs_dir,
+    )
+    if scene_dir is None:
+        print(f"Failed to process video {args.input_path}. Exiting.")
         sys.exit(1)
-elif os.path.isdir(args.input_path):
-    # Directory case
-    input_dir = os.path.join(args.input_path, "input")
-    depth_dir = os.path.join(args.input_path, "depth")
-    if not os.path.isdir(input_dir):
-        print(f"Error: Expected 'input/' subdirectory in {args.input_path}")
-        sys.exit(1)
-    cfg.gs.dataset.source_path = input_dir
-    if os.path.isdir(depth_dir):
-        cfg.gs.dataset.depth_path = depth_dir
-        print(f"Found depth maps in: {depth_dir}")
-    else:
-        cfg.gs.dataset.depth_path = None
-        print("No depth maps found; proceeding with RGB only.")
-    # Set model path
-    cfg.gs.dataset.model_path = os.path.join(args.outputs_dir, "models")
+    cfg.gs.dataset.source_path = scene_dir
+    cfg.gs.dataset.model_path = os.path.join(scene_dir, "models")
+    cfg.gs.dataset.depths = ""
+    print(f"Set model_path to: {cfg.gs.dataset.model_path}")
     os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
-else:
-    print(f"Error: {args.input_path} is neither a file nor a directory.")
+except Exception as e:
+    print(f"Error during video preprocessing: {e}")
     sys.exit(1)
 
 
