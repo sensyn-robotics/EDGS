@@ -12,6 +12,7 @@ import argparse
 import logging
 import os
 import random
+import shutil
 import sys
 
 import hydra
@@ -133,6 +134,13 @@ try:
 
     # Configure depth supervision if depth maps are available
     if depth_dir is not None and cfg.gs.dataset.depths.enabled:
+        # Copy depth maps to the scene directory
+        scene_depth_dir = os.path.join(scene_dir, "depth")
+        if not os.path.exists(scene_depth_dir):
+            print(f"Copying depth maps from {depth_dir} to {scene_depth_dir}")
+            shutil.copytree(depth_dir, scene_depth_dir)
+            print(f"Copied {len(os.listdir(scene_depth_dir))} depth files")
+
         # Copy depth_params.json from the depth directory to sparse/0/
         source_depth_params = os.path.join(depth_dir, "depth_params.json")
         target_depth_params = os.path.join(
@@ -140,8 +148,6 @@ try:
         )
 
         if os.path.exists(source_depth_params):
-            import shutil
-
             shutil.copy2(source_depth_params, target_depth_params)
             print("Copied depth_params.json to COLMAP directory")
         else:

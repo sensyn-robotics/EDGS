@@ -42,7 +42,7 @@ dataset:
   densify_until_iter: 15000
   source_path: "" #path to dataset
   model_path: "" #path to logs
-  depth_path: ""
+  depth_path: depth
   images: images
   resolution: -1
   white_background: false

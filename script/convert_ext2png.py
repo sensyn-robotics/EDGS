@@ -43,11 +43,11 @@ try:
     iio.imwrite('{png_path_escaped}', depth_scaled)
     exr_file.close()
     
-    # Output statistics as JSON
+    # Output statistics as JSON - use "scale" instead of "scale_factor"
     stats = {{
         "original_min": original_min,
         "original_max": original_max,
-        "scale_factor": {scale_factor}
+        "scale": {scale_factor}
     }}
     print("SUCCESS:" + json.dumps(stats))
 except Exception as e:
@@ -123,8 +123,8 @@ def main(input_dir, output_dir, scale_factor):
             # Still need to add to depth_params if not already there
             if base_name not in depth_params:
                 depth_params[base_name] = {
-                    "scale_factor": scale_factor,
-                    "original_min": 0.0,  # Default values for existing files
+                    "scale": scale_factor,  # Changed from "scale_factor" to "scale"
+                    "original_min": 0.0,
                     "original_max": 65.535,
                     "format": "png",
                     "data_type": "uint16",
@@ -137,9 +137,9 @@ def main(input_dir, output_dir, scale_factor):
 
         if success and depth_stats:
             successful_files += 1
-            # Store depth parameters for this file
+            # Store depth parameters for this file - use "scale" instead of "scale_factor"
             depth_params[base_name] = {
-                "scale_factor": depth_stats["scale_factor"],
+                "scale": depth_stats["scale"],  # Changed from "scale_factor" to "scale"
                 "original_min": depth_stats["original_min"],
                 "original_max": depth_stats["original_max"],
                 "format": "png",
