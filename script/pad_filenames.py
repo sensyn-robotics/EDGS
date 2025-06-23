@@ -4,89 +4,84 @@ import os
 import re
 
 
-def pad_filenames(base_dir):
+def pad_files_in_directory(directory, file_extension):
     """
-    Add zero-padding to filenames while preserving original numbers.
-    This maintains correspondence between RGB images and depth files.
+    Add zero-padding to filenames in a specific directory while preserving original numbers.
 
     Args:
-        base_dir: Base directory containing input/ and exr/ subdirectories
+        directory: Directory path containing files to pad
+        file_extension: File extension to process (e.g., 'jpg', 'exr')
+
+    Returns:
+        Number of files processed
+    """
+    if not os.path.exists(directory):
+        print(f"Warning: {directory} directory not found")
+        return 0
+
+    files = glob.glob(os.path.join(directory, f"*.{file_extension}"))
+    print(f"Found {len(files)} {file_extension.upper()} files in {directory}")
+
+    processed_count = 0
+    for file_path in files:
+        old_name = os.path.basename(file_path)
+        # Extract number from filename
+        match = re.search(r"(\d+)", old_name)
+        if match:
+            number = int(match.group(1))
+            new_name = f"{number:08d}.{file_extension}"  # Pad the original number
+            new_path = os.path.join(directory, new_name)
+
+            if file_path != new_path:
+                os.rename(file_path, new_path)
+                print(f"  Renamed {old_name} -> {new_name}")
+                processed_count += 1
+        else:
+            print(f"  Skipping {old_name} - no number found")
+
+    print(f"{file_extension.upper()} files padded while preserving original numbers")
+    return processed_count
+
+
+def pad_filenames(base_dir):
+    """
+    Add zero-padding to record3D filenames while preserving original numbers.
+    Processes rgb/*.jpg and depth/*.exr files.
+
+    Args:
+        base_dir: Base directory containing rgb/ and depth/ subdirectories
     """
 
-    print(f"Processing files in: {base_dir}")
+    print(f"Processing record3D files in: {base_dir}")
 
-    # Step 1: Pad .jpg files in input/ directory
-    input_dir = os.path.join(base_dir, "input")
-    if os.path.exists(input_dir):
-        jpg_files = glob.glob(os.path.join(input_dir, "*.jpg"))
-        print(f"Found {len(jpg_files)} JPG files in {input_dir}")
+    # Process RGB files
+    rgb_dir = os.path.join(base_dir, "rgb")
+    rgb_count = pad_files_in_directory(rgb_dir, "jpg")
 
-        for file_path in jpg_files:
-            old_name = os.path.basename(file_path)
-            # Extract number from filename
-            match = re.search(r"(\d+)", old_name)
-            if match:
-                number = int(match.group(1))
-                new_name = f"{number:08d}.jpg"  # Pad the original number
-                new_path = os.path.join(input_dir, new_name)
-
-                if file_path != new_path:
-                    os.rename(file_path, new_path)
-                    print(f"  Renamed {old_name} -> {new_name}")
-
-        print("JPG files padded while preserving original numbers")
-    else:
-        print(f"Warning: {input_dir} directory not found")
-
-    # Step 2: Pad .exr files in exr/ directory
-    exr_dir = os.path.join(base_dir, "exr")
-    if os.path.exists(exr_dir):
-        exr_files = glob.glob(os.path.join(exr_dir, "*.exr"))
-        print(f"Found {len(exr_files)} EXR files in {exr_dir}")
-
-        for file_path in exr_files:
-            old_name = os.path.basename(file_path)
-            # Extract number from filename
-            match = re.search(r"(\d+)", old_name)
-            if match:
-                number = int(match.group(1))
-                new_name = f"{number:08d}.exr"  # Pad the original number
-                new_path = os.path.join(exr_dir, new_name)
-
-                if file_path != new_path:
-                    os.rename(file_path, new_path)
-                    print(f"  Renamed {old_name} -> {new_name}")
-
-        print("EXR files padded while preserving original numbers")
-    else:
-        print(f"Warning: {exr_dir} directory not found")
-
-    # Step 3: Clean up existing depth directory if it exists
+    # Process depth files
     depth_dir = os.path.join(base_dir, "depth")
-    if os.path.exists(depth_dir):
-        print(f"Removing existing depth directory to force regeneration: {depth_dir}")
-        import shutil
+    depth_count = pad_files_in_directory(depth_dir, "exr")
 
-        shutil.rmtree(depth_dir)
-
-    print("File padding complete!")
+    print("\nFile padding complete!")
+    print(f"✓ Processed {rgb_count} RGB files and {depth_count} depth files")
     print("✓ Original file numbers preserved - RGB/depth correspondence maintained")
+
     print("\nNext steps:")
     print(
-        f"1. Run: python script/convert_ext2png.py --input_dir {base_dir}/exr/ --output_dir {base_dir}/depth/"
+        f"1. Run: python script/convert_ext2png.py --input_dir {base_dir}/depth/ --output_dir {base_dir}/depth_png/"
     )
     print(f"2. Run: python script/fit_model_to_scene_full.py --input_path {base_dir}/")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Pad RGB and EXR filenames with zero-padding while preserving original numbers"
+        description="Pad record3D RGB and depth filenames with zero-padding while preserving original numbers"
     )
     parser.add_argument(
         "--base_dir",
         type=str,
         required=True,
-        help="Base directory containing input/ and exr/ subdirectories",
+        help="Base directory containing rgb/ and depth/ subdirectories",
     )
 
     args = parser.parse_args()
