@@ -87,22 +87,87 @@ print(OmegaConf.to_yaml(cfg))
 # process the input video/directory.
 print(f"Starting processing for: {args.input_path}")
 try:
+    if os.path.isfile(args.input_path):
+        # Video file case - no depth support
+        colmap_input = args.input_path
+        depth_dir = None
+    elif os.path.isdir(args.input_path):
+        # Directory case: check for input/ and depth/ subdirectories
+        input_subdir = os.path.join(args.input_path, "input")
+        depth_subdir = os.path.join(args.input_path, "depth")
+
+        if not os.path.isdir(input_subdir):
+            print(f"Error: Expected 'input/' subdirectory in {args.input_path}")
+            sys.exit(1)
+
+        colmap_input = input_subdir
+
+        # Check for depth directory
+        if os.path.isdir(depth_subdir) and len(os.listdir(depth_subdir)) > 0:
+            depth_dir = depth_subdir
+            print(
+                f"Found depth directory with {len(os.listdir(depth_subdir))} files: {depth_subdir}"
+            )
+        else:
+            depth_dir = None
+            print("No depth directory found - proceeding with RGB-only processing")
+    else:
+        print(f"Error: {args.input_path} is neither a file nor a directory.")
+        sys.exit(1)
+
+    # Run COLMAP on RGB images only
     _, scene_dir = orchestrate_video_to_colmap_scene(
-        args.input_path,
+        colmap_input,
         cfg.init_wC.num_refs,
         max_size=1024,
         base_work_dir=args.outputs_dir,
     )
+
     if scene_dir is None:
-        print(f"Failed to process video {args.input_path}. Exiting.")
+        print(f"Failed to process {args.input_path}. Exiting.")
         sys.exit(1)
+
+    # Set up dataset paths
     cfg.gs.dataset.source_path = scene_dir
     cfg.gs.dataset.model_path = os.path.join(scene_dir, "models")
-    cfg.gs.dataset.depths = ""
+
+    # Configure depth supervision if depth maps are available
+    if depth_dir is not None and cfg.gs.dataset.depths.enabled:
+        # Copy depth_params.json from the depth directory to sparse/0/
+        source_depth_params = os.path.join(depth_dir, "depth_params.json")
+        target_depth_params = os.path.join(
+            scene_dir, "sparse", "0", "depth_params.json"
+        )
+
+        if os.path.exists(source_depth_params):
+            import shutil
+
+            shutil.copy2(source_depth_params, target_depth_params)
+            print("Copied depth_params.json to COLMAP directory")
+        else:
+            print(f"Warning: depth_params.json not found at {source_depth_params}")
+
+        # The 3DGS dataset loader expects depth maps to be in a specific location
+        # relative to the COLMAP scene. We need to set the depth path correctly.
+        cfg.gs.dataset.depths = depth_dir  # Set the depth directory path
+        print(f"Depth supervision enabled. Depth path: {depth_dir}")
+        print(
+            "Make sure your dataset loader can find depth maps matching the COLMAP images."
+        )
+    else:
+        # Disable depth supervision
+        cfg.gs.dataset.depths = ""
+        if hasattr(cfg.gs.dataset.depths, "enabled"):
+            cfg.gs.dataset.depths.enabled = False
+        print("Depth supervision disabled")
+
+    print(f"Set source_path to: {cfg.gs.dataset.source_path}")
     print(f"Set model_path to: {cfg.gs.dataset.model_path}")
+
     os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
+
 except Exception as e:
-    print(f"Error during video preprocessing: {e}")
+    print(f"Error during preprocessing: {e}")
     sys.exit(1)
 
 
