@@ -50,7 +50,7 @@ parser.add_argument(
     "--input_path",
     type=str,
     default=os.path.join(project_root, "assets", "examples", "video_fruits.mp4"),
-    help="Path to the input video file or directory containing input/ and optionally depth/.",
+    help="Path to the input video file or directory containing rgb/ and optionally depth/.",
 )
 parser.add_argument(
     "--outputs_dir",
@@ -94,14 +94,14 @@ try:
         depth_dir = None
     elif os.path.isdir(args.input_path):
         # Directory case: check for input/ and depth/ subdirectories
-        input_subdir = os.path.join(args.input_path, "input")
+        rgb_subdir = os.path.join(args.input_path, "rgb")
         depth_subdir = os.path.join(args.input_path, "depth")
 
-        if not os.path.isdir(input_subdir):
-            print(f"Error: Expected 'input/' subdirectory in {args.input_path}")
+        if not os.path.isdir(rgb_subdir):
+            print(f"Error: Expected 'rgb/' subdirectory in {args.input_path}")
             sys.exit(1)
 
-        colmap_input = input_subdir
+        colmap_input = rgb_subdir
 
         # Check for depth directory
         if os.path.isdir(depth_subdir) and len(os.listdir(depth_subdir)) > 0:

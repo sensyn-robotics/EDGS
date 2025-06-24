@@ -104,8 +104,10 @@ python script/fit_model_to_scene_full.py --input_path <your mp4 video/ or colmap
 
 In case you get depth using iPhone and record3D;
 ```
+docker compose exec edgs-app bash
 python script/pad_filenames.py --base_dir <your record3D data dir>
-python script/convert_ext2png.py --input_dir <your record3D data dir>/exr/ --output_dir <your record3D data dir>/depth/
+python script/convert_ext2png.py --input_dir <your record3D data dir>/depth/ --output_dir <your record3D data dir>/depth/
+python script/fit_model_to_scene_full.py --input_path <your mp4 video/ or colmap style directory> [--processed_scenes_dir <output directory>]
 ```
 
 #### Option C
