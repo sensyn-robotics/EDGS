@@ -5,15 +5,10 @@ services:
     ports:
       - "7862:7862" # For Gradio, if you still use it
       - "8888:8888" # Map port 8888 for JupyterLab
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all # Use all available GPUs
-              capabilities: [gpu] # Request GPU capabilities
+    runtime: nvidia # Use NVIDIA runtime for GPU support
     environment:
       - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
     volumes:
       - ./data:/EDGS/data # Example: map a local 'data' folder to '/EDGS/data' in the container
       - ./outputs:/EDGS/outputs # Example: map a local 'output' folder
