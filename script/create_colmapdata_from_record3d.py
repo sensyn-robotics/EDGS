@@ -17,8 +17,8 @@ logging.basicConfig(
 
 # --- setting ---
 # Record3D exported path
-RECORD3D_DATA_PATH = "data/office_fakegreen/"
-COLMAP_OUTPUT_PATH = "data/office_fakegreen/"
+RECORD3D_DATA_PATH = "data/sample/"
+COLMAP_OUTPUT_PATH = RECORD3D_DATA_PATH
 # sampling number per frame for points3D.bin
 NUM_POINTS_TO_SAMPLE_FOR_POINTS3D_BIN = 1000
 
@@ -289,7 +289,7 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
             current_intrinsics[3],
         )
 
-        # sample 3D points randomly.
+        # sample 3D points randomly for COLMAP sparce poiints
         actual_height, actual_width = depth_image.shape[:2]
         num_pixels = actual_height * actual_width
         num_samples_current_frame = min(
@@ -298,6 +298,7 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
         sample_indices = np.random.choice(
             num_pixels, num_samples_current_frame, replace=False
         )
+        # convert 1d to 2d indices.
         rows, cols = np.unravel_index(sample_indices, (actual_height, actual_width))
 
         # Load RGB image once per frame (outside the loop)
@@ -334,11 +335,10 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
                 color = rgb_image_data[rgb_r, rgb_c, :3]  # get R, G, B (0-255)
 
                 # add to COLMAP Point3D object
-                colmap_points3D[point_id_counter] = pycolmap.Point3D(
-                    xyz=point_world,
-                    color=color.astype(np.uint8),
-                    error=0.0,
-                )
+                colmap_points3D[point_id_counter] = {
+                    "xyz": point_world,
+                    "color": color.astype(np.uint8),
+                }
 
                 point_id_counter += 1
 
@@ -363,9 +363,13 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
         for image_id, image in colmap_images.items():
             reconstruction.add_image(image)
 
-        # Add points3D (no manual ID setting needed)
-        for point3d_id, point3d in colmap_points3D.items():
-            reconstruction.add_point3d(point3d)
+        # Add points3D using the correct method signature
+        for point3d_id, point_data in colmap_points3D.items():
+            # The add_point3D method expects: xyz, track, color
+            track = pycolmap.Track()  # Create empty track
+            reconstruction.add_point3D(
+                xyz=point_data["xyz"], track=track, color=point_data["color"]
+            )
 
         # Write the reconstruction
         reconstruction.write_binary(sparse_dir)
@@ -394,14 +398,14 @@ if __name__ == "__main__":
 
     if convert_record3d_to_colmap(RECORD3D_DATA_PATH, COLMAP_OUTPUT_PATH):
         logger.info("\n変換が完了しました。")
-        logger.info("EDGSの学習を実行するには、以下のコマンドを参考にしてください:")
-        logger.info("CUDA_VISIBLE_DEVICES=0 python train.py \\")
-        logger.info("train.gs_epochs=30000 \\")
-        logger.info("train.no_densify=True \\")
-        logger.info(f"gs.dataset.source_path={COLMAP_OUTPUT_PATH} \\")
-        logger.info("gs.dataset.model_path=/path/to/output_model_folder \\")
-        logger.info("init_wC.matches_per_ref=20000 \\")
-        logger.info("init_wC.nns_per_ref=3 \\")
-        logger.info("init_wC.num_refs=180")
+        print("EDGSの学習を実行するには、以下のコマンドを参考にしてください:")
+        print("CUDA_VISIBLE_DEVICES=0 python train.py \\")
+        print("train.gs_epochs=30000 \\")
+        print("train.no_densify=True \\")
+        print(f"gs.dataset.source_path={COLMAP_OUTPUT_PATH} \\")
+        print("gs.dataset.model_path=/path/to/output_model_folder \\")
+        print("init_wC.matches_per_ref=20000 \\")
+        print("init_wC.nns_per_ref=3 \\")
+        print("init_wC.num_refs=180")
     else:
         logger.error("\nFailed to conversion. See the logs for details.")
