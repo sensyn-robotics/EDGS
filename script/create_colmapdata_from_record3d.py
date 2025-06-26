@@ -168,22 +168,22 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
     # So we use initial frame's one.
     first_intrinsics = metadata["perFrameIntrinsicCoeffs"][0]
     # COLMAPのPINHOLE expects fx, fy, cx, cy.
-    colmap_cameras = {
-        1: pycolmap.Camera(
-            model="PINHOLE",
-            width=rgb_width,
-            height=rgb_height,
-            params=np.array(
-                [
-                    first_intrinsics[0],  # fx
-                    first_intrinsics[1],  # fy
-                    first_intrinsics[2],  # cx
-                    first_intrinsics[3],  # cy
-                ],
-                dtype=np.float64,
-            ),
-        )
-    }
+    camera = pycolmap.Camera(
+        model="PINHOLE",
+        width=rgb_width,
+        height=rgb_height,
+        params=np.array(
+            [
+                first_intrinsics[0],  # fx
+                first_intrinsics[1],  # fy
+                first_intrinsics[2],  # cx
+                first_intrinsics[3],  # cy
+            ],
+            dtype=np.float64,
+        ),
+    )
+    camera.camera_id = 1  # Explicitly set the camera ID
+    colmap_cameras = {1: camera}
 
     colmap_images = {}
     colmap_points3D = {}
@@ -352,8 +352,11 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
         # Create reconstruction object and write to files
         reconstruction = pycolmap.Reconstruction()
 
-        # Add cameras (pycolmap handles IDs internally based on constructor)
+        # Add cameras with explicit ID verification
         for camera_id, camera in colmap_cameras.items():
+            # Ensure camera has the correct ID set
+            if not hasattr(camera, "camera_id") or camera.camera_id != camera_id:
+                camera.camera_id = camera_id
             reconstruction.add_camera(camera)
 
         # Add images (IDs are already set in constructor)
