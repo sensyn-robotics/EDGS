@@ -1,3 +1,4 @@
+import argparse
 import json
 import logging
 import os
@@ -14,13 +15,6 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
-
-# --- setting ---
-# Record3D exported path
-RECORD3D_DATA_PATH = "data/sample/"
-COLMAP_OUTPUT_PATH = RECORD3D_DATA_PATH
-# sampling number per frame for points3D.bin
-NUM_POINTS_TO_SAMPLE_FOR_POINTS3D_BIN = 1000
 
 
 def validate_exr_file(file_path):
@@ -142,7 +136,9 @@ except Exception as e:
         return False, None
 
 
-def convert_record3d_to_colmap(record3d_path, colmap_output_path):
+def convert_record3d_to_colmap(
+    record3d_path, colmap_output_path, num_points_to_sample=1000
+):
     logger.info(
         f"Converting Record3D data to COLMAP format: {record3d_path} -> {colmap_output_path}"
     )
@@ -292,9 +288,7 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
         # sample 3D points randomly for COLMAP sparce poiints
         actual_height, actual_width = depth_image.shape[:2]
         num_pixels = actual_height * actual_width
-        num_samples_current_frame = min(
-            NUM_POINTS_TO_SAMPLE_FOR_POINTS3D_BIN, num_pixels
-        )
+        num_samples_current_frame = min(num_points_to_sample, num_pixels)
         sample_indices = np.random.choice(
             num_pixels, num_samples_current_frame, replace=False
         )
@@ -386,26 +380,60 @@ def convert_record3d_to_colmap(record3d_path, colmap_output_path):
         return False
 
 
-if __name__ == "__main__":
-    if not os.path.exists(RECORD3D_DATA_PATH):
-        logger.error(f"There is no Record3D data path: {RECORD3D_DATA_PATH}")
-        logger.error("set proper RECORD3D_DATA_PATH")
-    elif not os.path.exists(COLMAP_OUTPUT_PATH):
-        logger.warning(
-            f"There is no COLMAP output path: {COLMAP_OUTPUT_PATH}. Creating it..."
-        )
-        os.makedirs(COLMAP_OUTPUT_PATH, exist_ok=True)
+def main():
+    parser = argparse.ArgumentParser(
+        description="Convert Record3D data to COLMAP format"
+    )
+    parser.add_argument(
+        "--record3d_path",
+        type=str,
+        default="data/sample/",
+        help="Path to Record3D exported data directory (default: data/sample/)",
+    )
+    parser.add_argument(
+        "--output_path",
+        type=str,
+        help="Output path for COLMAP data (default: same as record3d_path)",
+    )
+    parser.add_argument(
+        "--num_points",
+        type=int,
+        default=1000,
+        help="Number of points to sample per frame for points3D.bin (default: 1000)",
+    )
 
-    if convert_record3d_to_colmap(RECORD3D_DATA_PATH, COLMAP_OUTPUT_PATH):
+    args = parser.parse_args()
+
+    record3d_path = args.record3d_path
+    colmap_output_path = args.output_path if args.output_path else record3d_path
+    num_points_to_sample = args.num_points
+
+    if not os.path.exists(record3d_path):
+        logger.error(f"There is no Record3D data path: {record3d_path}")
+        logger.error("set proper --record3d_path")
+        return
+    elif not os.path.exists(colmap_output_path):
+        logger.warning(
+            f"There is no COLMAP output path: {colmap_output_path}. Creating it..."
+        )
+        os.makedirs(colmap_output_path, exist_ok=True)
+
+    if convert_record3d_to_colmap(
+        record3d_path, colmap_output_path, num_points_to_sample
+    ):
         logger.info("\n変換が完了しました。")
         print("EDGSの学習を実行するには、以下のコマンドを参考にしてください:")
         print("CUDA_VISIBLE_DEVICES=0 python train.py \\")
         print("train.gs_epochs=30000 \\")
         print("train.no_densify=True \\")
-        print(f"gs.dataset.source_path={COLMAP_OUTPUT_PATH} \\")
+        print(f"gs.dataset.source_path={colmap_output_path} \\")
         print("gs.dataset.model_path=/path/to/output_model_folder \\")
         print("init_wC.matches_per_ref=20000 \\")
         print("init_wC.nns_per_ref=3 \\")
         print("init_wC.num_refs=180")
     else:
         logger.error("\nFailed to conversion. See the logs for details.")
+
+
+if __name__ == "__main__":
+    main()

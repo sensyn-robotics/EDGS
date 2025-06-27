@@ -99,6 +99,7 @@ python script/gradio_demo.py --port 7862
 From command line.
 ```
 docker compose exec edgs-app bash
+ python script/create_colmapdata_from_record3d.py --record3d_path <your Record3D output directory which contains rgb/ and depth/>
 python script/fit_model_to_scene_full.py --input_path <your mp4 video/ or colmap style directory> [--processed_scenes_dir <output directory>]
 ```
 
