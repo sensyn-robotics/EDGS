@@ -341,7 +341,37 @@ def convert_record3d_to_colmap(
             f"processed {i + 1} frames. current number of 3D points: {len(colmap_points3D)}\r"
         )
 
-    # 3. write to COLMAP .bin
+    # 3. Create depth_params.json for EDGS (simple format that won't cause parsing errors)
+    depth_params = {}
+
+    # Add depth parameters for each image based on convert_ext2png.py format
+    for i, frame_pose_data in enumerate(metadata["poses"]):
+        image_name = f"rgb_{i:05d}"  # Match the image naming pattern
+        depth_params[image_name] = {
+            "scale": 1.0,  # Record3D depth is already in meters
+            "original_min": 0.1,
+            "original_max": 10.0,
+            "format": "exr",
+            "data_type": "float32",
+        }
+    depth_params_path = os.path.join(sparse_dir, "depth_params.json")
+    with open(depth_params_path, "w") as f:
+        json.dump(depth_params, f, indent=2)
+    logger.info(f"Created depth_params.json at {depth_params_path}")
+
+    # 4. Copy depth files to output directory if they exist
+    depth_source_dir = os.path.join(record3d_path, "depth")
+    if os.path.exists(depth_source_dir):
+        depth_output_dir = os.path.join(colmap_output_path, "depth")
+        if not os.path.exists(depth_output_dir):
+            import shutil
+
+            shutil.copytree(depth_source_dir, depth_output_dir)
+            logger.info(
+                f"Copied depth files from {depth_source_dir} to {depth_output_dir}"
+            )
+
+    # 5. write to COLMAP .bin
     try:
         # Create reconstruction object and write to files
         reconstruction = pycolmap.Reconstruction()
@@ -423,7 +453,7 @@ def main():
     ):
         logger.info("\n変換が完了しました。")
         print("EDGSの学習を実行するには、以下のコマンドを参考にしてください:")
-        print("CUDA_VISIBLE_DEVICES=0 python train.py \\")
+        print("CUDA_VISIBLE_DEVICES=0 python script/train.py \\")
         print("train.gs_epochs=30000 \\")
         print("train.no_densify=True \\")
         print(f"gs.dataset.source_path={colmap_output_path} \\")
