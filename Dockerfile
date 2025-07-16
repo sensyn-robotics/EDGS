@@ -28,6 +28,13 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86
   rm /tmp/miniconda.sh
 ENV PATH="/opt/conda/bin:${PATH}"
 
+# Accept Anaconda TOS before using conda
+RUN conda init bash && \
+  conda config --set always_yes yes --set changeps1 no && \
+  conda config --add channels defaults && \
+  conda config --set channel_priority strict && \
+  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/main && \
+  conda tos accept --override-channels --channel https://repo.anaconda.com/pkgs/r
 # Create the conda environment and install dependencies
 RUN conda create -y -n edgs python=3.10 pip && \
   conda clean -afy && \
