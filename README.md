@@ -133,6 +133,32 @@ scene_folder
         |---points3D.bin
 ```
 
+⚠️ **Important: Camera Model Compatibility**
+
+EDGS requires **undistorted** COLMAP datasets with PINHOLE or SIMPLE_PINHOLE camera models. If your COLMAP dataset uses distorted camera models (like SIMPLE_RADIAL, RADIAL, OPENCV, etc.), you must first undistort it:
+
+```bash
+docker compose exec edgs-app bash
+# Undistort your dataset
+python script/undistort_colmap.py data/your_dataset data/your_dataset_undistorted
+```
+
+This script will:
+- Convert distorted camera models to undistorted PINHOLE models
+- Generate undistorted images with proper camera parameters
+- Maintain reconstruction accuracy while ensuring compatibility
+
+**When to use undistortion:**
+- Your COLMAP dataset has camera models other than PINHOLE/SIMPLE_PINHOLE
+- You get errors like "Colmap camera model not handled: only undistorted datasets supported"
+- You processed your images with COLMAP using camera models that include distortion parameters
+
+After undistortion, use the undistorted dataset path for training:
+```bash
+# Use the undistorted dataset
+python script/train.py gs.dataset.source_path=data/your_dataset_undistorted ...
+```
+
 ```
 docker compose exec edgs-app bash
 ```
