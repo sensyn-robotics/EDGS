@@ -246,6 +246,22 @@ def aggregate_confidences_and_warps(viewpoint_stack, closest_indices, roma_model
                                                               torch.stack(warps_all, dim=0),
                                                               target_shape
                                                               )
+    
+    # Resize images in imB_compound to target_shape to ensure consistent shapes for np.stack
+    from PIL import Image
+    imB_compound_resized = []
+    for imB in imB_compound:
+        if imB.shape[:2] != target_shape:
+            # Convert numpy array to PIL Image for resizing
+            imB_pil = Image.fromarray((imB * 255).astype(np.uint8))
+            # Resize to target shape (height, width)
+            imB_resized_pil = imB_pil.resize((target_shape[1], target_shape[0]), Image.LANCZOS)
+            # Convert back to numpy array and normalize
+            imB_resized = np.array(imB_resized_pil) / 255.0
+            imB_compound_resized.append(imB_resized)
+        else:
+            imB_compound_resized.append(imB)
+    imB_compound = imB_compound_resized
 
     if verbose:
         print("warps_all_resized.shape:", warps_all_resized.shape)
