@@ -373,7 +373,8 @@ def extract_keypoints_and_colors(imA, imB_compound, certainties_max, certainties
     # New experimental version
     kptsA_x = np.round(kptsA_np[:, 0] / 1.).astype(int)
     kptsA_y = np.round(kptsA_np[:, 1] / 1.).astype(int)
-    kptsA_color = imA[np.clip(kptsA_x, 0, H - 1), np.clip(kptsA_y, 0, W - 1)]
+    # Use imA dimensions for clipping, not certainty map dimensions
+    kptsA_color = imA[np.clip(kptsA_x, 0, H_A - 1), np.clip(kptsA_y, 0, W_A - 1)]
    
     # Create a composite image from imB_compound
     imB_compound_np = np.stack(imB_compound, axis=0)
