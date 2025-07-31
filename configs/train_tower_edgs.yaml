@@ -1,0 +1,44 @@
+defaults:
+  - train
+  - _self_
+
+# EDGS configuration for tower scenes
+# Focus on better initialization and training without densification
+
+# EDGS core principle - NO densification
+train:
+  no_densify: True  # This is the key feature of EDGS!
+  gs_epochs: 60000  # More iterations for convergence
+  reduce_opacity: True
+  max_lr: True
+
+# Gaussian Splatting optimization for EDGS
+gs:
+  opt:
+    # Larger batch size for stability
+    batch_size: 64  # Larger batches help with convergence
+    
+    # Opacity reset - helps remove bad gaussians
+    opacity_reset_interval: 3000  # Reset more frequently
+    
+    # Learning rates - critical for convergence without densification
+    position_lr_init: 0.00032      # Higher position learning rate
+    position_lr_final: 0.0000032   # Higher final rate too
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 40000   # Extended learning
+    
+    # Other learning rates
+    feature_lr: 0.005     # Higher for better convergence
+    opacity_lr: 0.1       # Higher opacity learning
+    scaling_lr: 0.005     # Higher scaling learning
+    rotation_lr: 0.002    # Higher rotation learning
+
+# Critical: Better initialization for EDGS
+init_wC:
+  matches_per_ref: 40000    # Much more matches for dense init
+  num_refs: 500            # Use more reference views
+  nns_per_ref: 7           # More nearest neighbors
+  scaling_factor: 0.0003   # Smaller initial gaussians
+  proj_err_tolerance: 0.003  # Stricter tolerance
+  roma_model: "outdoors"   # Outdoor model for drone
+  add_SfM_init: True       # Include SfM points

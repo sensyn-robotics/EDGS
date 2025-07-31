@@ -1,0 +1,45 @@
+defaults:
+  - train
+  - _self_
+
+# High-quality configuration for tower/industrial scenes
+# This config optimizes for steel tower reconstruction with better convergence
+
+# Enable densification for better coverage of complex structures
+train:
+  no_densify: False  # Enable densification for towers
+  gs_epochs: 60000  # More training iterations for convergence
+  max_lr: True      # Use max learning rate for faster convergence
+
+# Override Gaussian Splatting optimization settings for better quality
+gs:
+  opt:
+    # Slightly larger batch size for stability
+    batch_size: 32  # Increased from low memory config
+    
+    # More aggressive densification for steel structures
+    densify_from_iter: 500
+    densify_until_iter: 25000  # Extended densification period
+    densify_grad_threshold: 0.0001  # Lower threshold for more densification
+    
+    # Position learning rate - crucial for tower convergence
+    position_lr_init: 0.00016
+    position_lr_final: 0.0000016
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
+    
+    # Feature learning rates
+    feature_lr: 0.0025
+    opacity_lr: 0.05
+    scaling_lr: 0.001
+    rotation_lr: 0.001
+
+# High-quality initialization settings for tower scenes
+init_wC:
+  matches_per_ref: 25000  # More matches for complex structures
+  num_refs: 360  # Use all available reference views
+  nns_per_ref: 5  # More nearest neighbors for better coverage
+  scaling_factor: 0.0005  # Smaller initial scaling for fine details
+  proj_err_tolerance: 0.005  # Stricter projection error tolerance
+  roma_model: "outdoors"  # Outdoor model for drone footage
+  add_SfM_init: True  # Add SfM points for better initialization
