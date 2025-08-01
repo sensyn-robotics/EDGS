@@ -3,29 +3,42 @@ defaults:
   - _self_
 
 # Low memory configuration for EDGS
-# This config reduces memory usage while maintaining quality
+# Optimized for 6-8GB GPUs with good quality/memory balance
+# Combines the best settings from previous tower configs
 
-# Disable densification to avoid memory spikes
+# EDGS core - disable densification to save memory
 train:
-  no_densify: True  # EDGS works well without densification
-  gs_epochs: 60000  # Keep full training iterations for quality
+  no_densify: True  # EDGS principle - no densification needed
+  gs_epochs: 30000  # Balanced training iterations
+  reduce_opacity: True  # Help clean up bad gaussians
+  max_lr: True  # Use max learning rate for better convergence
 
-# Override Gaussian Splatting optimization settings for lower memory
+# Memory-optimized Gaussian Splatting settings
 gs:
   opt:
-    # Reduce batch size to use less memory per iteration
-    batch_size: 16  # Reduced from 64
+    # Moderate batch size for memory efficiency
+    batch_size: 16  # Balanced for 6-8GB memory
     
-    # Increase opacity reset interval to avoid frequent memory allocations
-    opacity_reset_interval: 1_000_000  # Effectively disable opacity reset
+    # Opacity reset for cleanup without too much memory overhead
+    opacity_reset_interval: 5000  # Periodic cleanup
     
-    # Keep densification settings but they won't be used due to no_densify
-    densify_from_iter: 500
-    densify_until_iter: 15000
-    densify_grad_threshold: 0.0002
+    # Optimized learning rates for EDGS convergence
+    position_lr_init: 0.00024      # Higher than default for better convergence
+    position_lr_final: 0.0000024   # Balanced final rate
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
     
-# Keep high quality initialization settings
+    # Other learning rates optimized for EDGS
+    feature_lr: 0.0035    # Moderate increase for better features
+    opacity_lr: 0.07      # Balanced opacity learning
+    scaling_lr: 0.003     # Moderate scaling learning
+    rotation_lr: 0.0015   # Balanced rotation learning
+
+# Good initialization within memory limits
 init_wC:
-  matches_per_ref: 15000  # Slightly reduced from 20000 for memory
-  num_refs: 180  # Reduced from 360 but still high quality
-  nns_per_ref: 3  # Keep nearest neighbors for good initialization
+  matches_per_ref: 15000    # Good coverage without OOM
+  num_refs: 180            # Balanced reference views
+  nns_per_ref: 5           # Good neighbor count for quality
+  scaling_factor: 0.0004   # Balanced initial scale
+  proj_err_tolerance: 0.005  # Reasonable tolerance
+  add_SfM_init: True       # Include SfM points for better initialization

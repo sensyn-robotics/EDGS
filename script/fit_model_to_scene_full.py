@@ -75,7 +75,7 @@ parser.add_argument(
     "--config",
     type=str,
     default="train",
-    help="Config name to use (e.g., 'train', 'train_low_memory', 'train_very_low_memory'). Default: train",
+    help="Config name to use. Options: 'train' (standard), 'train_high_quality' (best quality, 12GB+ GPU), 'train_low_memory' (6-8GB GPU), 'train_very_low_memory' (4-6GB GPU). Default: train",
 )
 parser.add_argument(
     "--output_path",

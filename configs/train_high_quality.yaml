@@ -1,0 +1,44 @@
+defaults:
+  - train
+  - _self_
+
+# High-quality configuration for EDGS
+# Optimized for best reconstruction quality on high-end systems (12GB+ GPU)
+# Combines the best settings from previous specialized configs
+
+# EDGS with high-quality settings
+train:
+  no_densify: True  # EDGS principle - better initialization instead of densification
+  gs_epochs: 60000  # More training iterations for convergence
+  reduce_opacity: True  # Enable opacity reduction for cleanup
+  max_lr: True      # Use max learning rate for faster convergence
+
+# High-quality Gaussian Splatting optimization settings
+gs:
+  opt:
+    # Larger batch size for stability and better convergence
+    batch_size: 64  # Larger batches help with convergence
+    
+    # Opacity reset for removing bad gaussians
+    opacity_reset_interval: 3000  # More frequent cleanup
+    
+    # Optimized learning rates for best convergence without densification
+    position_lr_init: 0.00032      # Higher position learning rate
+    position_lr_final: 0.0000032   # Higher final rate too
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 40000   # Extended learning period
+    
+    # Other learning rates optimized for high quality
+    feature_lr: 0.005     # Higher for better feature convergence
+    opacity_lr: 0.1       # Higher opacity learning
+    scaling_lr: 0.005     # Higher scaling learning
+    rotation_lr: 0.002    # Higher rotation learning
+
+# High-quality initialization for best results
+init_wC:
+  matches_per_ref: 40000    # Much more matches for dense initialization
+  num_refs: 500            # Use many reference views
+  nns_per_ref: 7           # More nearest neighbors for better coverage
+  scaling_factor: 0.0003   # Smaller initial gaussians for fine details
+  proj_err_tolerance: 0.003  # Stricter projection error tolerance
+  add_SfM_init: True       # Include SfM points for comprehensive initialization

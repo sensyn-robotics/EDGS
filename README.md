@@ -119,12 +119,15 @@ python script/fit_model_to_scene_full.py \
     --output_path <edgs_output_path>
 ```
 
-3. **Memory-efficient configurations** - For GPUs with limited memory:
+3. **Memory-efficient configurations** - Choose based on your GPU memory:
 ```bash
-# Low memory mode (recommended for 12GB GPUs)
+# High quality mode (best quality, requires 12GB+ GPU)
+python script/fit_model_to_scene_full.py --video_path <video> --config train_high_quality
+
+# Low memory mode (good quality, for 6-8GB GPUs)
 python script/fit_model_to_scene_full.py --video_path <video> --config train_low_memory
 
-# Very low memory mode (for 8GB GPUs or very large scenes)  
+# Very low memory mode (minimal memory, for 4-6GB GPUs)  
 python script/fit_model_to_scene_full.py --video_path <video> --config train_very_low_memory
 ```
 
@@ -185,6 +188,7 @@ python script/fit_model_to_scene_full.py \
 # High-quality processing for complex scenes at original resolution
 python script/fit_model_to_scene_full.py \
     --video_path data/complex_scene.mp4 \
+    --config train_high_quality \
     --colmap_config high_accuracy \
     --target_fps 5.0 \
     --max_image_size -1 \
