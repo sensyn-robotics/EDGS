@@ -3,30 +3,30 @@ defaults:
   - _self_
 
 # Low memory configuration for EDGS
-# Optimized for 6-8GB GPUs with good quality/memory balance
-# Combines the best settings from previous tower configs
+# Optimized for 8-12GB GPUs with memory-safe settings
+# Conservative settings to avoid CUDA OOM errors
 
 # EDGS core - disable densification to save memory
 train:
   no_densify: True  # EDGS principle - no densification needed
-  gs_epochs: 30000  # Balanced training iterations
+  gs_epochs: 25000  # Reduced iterations to save memory
   reduce_opacity: True  # Help clean up bad gaussians
   max_lr: True  # Use max learning rate for better convergence
 
 # Memory-optimized Gaussian Splatting settings
 gs:
   opt:
-    # Moderate batch size for memory efficiency
-    batch_size: 16  # Balanced for 6-8GB memory
+    # Smaller batch size to avoid CUDA OOM
+    batch_size: 8  # Reduced from 16 to avoid memory spikes
     
     # Opacity reset for cleanup without too much memory overhead
-    opacity_reset_interval: 5000  # Periodic cleanup
+    opacity_reset_interval: 10000  # Less frequent to save memory
     
     # Optimized learning rates for EDGS convergence
     position_lr_init: 0.00024      # Higher than default for better convergence
     position_lr_final: 0.0000024   # Balanced final rate
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 30000
+    position_lr_max_steps: 25000
     
     # Other learning rates optimized for EDGS
     feature_lr: 0.0035    # Moderate increase for better features
@@ -34,11 +34,11 @@ gs:
     scaling_lr: 0.003     # Moderate scaling learning
     rotation_lr: 0.0015   # Balanced rotation learning
 
-# Good initialization within memory limits
+# Reduced initialization to avoid memory issues
 init_wC:
-  matches_per_ref: 15000    # Good coverage without OOM
-  num_refs: 180            # Balanced reference views
-  nns_per_ref: 5           # Good neighbor count for quality
-  scaling_factor: 0.0004   # Balanced initial scale
-  proj_err_tolerance: 0.005  # Reasonable tolerance
-  add_SfM_init: True       # Include SfM points for better initialization
+  matches_per_ref: 10000    # Reduced from 15000 to save memory
+  num_refs: 120            # Reduced from 180 to save memory
+  nns_per_ref: 3           # Reduced from 5 to save memory
+  scaling_factor: 0.0006   # Slightly larger to reduce gaussian count
+  proj_err_tolerance: 0.008  # More lenient to reduce points
+  add_SfM_init: False      # Disable SfM to save memory
