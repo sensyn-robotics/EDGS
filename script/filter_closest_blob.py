@@ -33,6 +33,8 @@ import sys
 from collections import defaultdict
 from sklearn.cluster import DBSCAN
 from scipy.spatial import KDTree
+import json
+from datetime import datetime
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -195,12 +197,12 @@ def analyze_clusters_by_distance(coords, labels, camera_centers):
         std_dist = np.std(all_distances)
         
         cluster_stats.append({
-            'id': cluster_id,
-            'size': len(cluster_points),
-            'min_dist': min_dist,
-            'avg_dist': avg_dist,
-            'max_dist': max_dist,
-            'std_dist': std_dist
+            'id': int(cluster_id),  # Convert to int for JSON serialization
+            'size': int(len(cluster_points)),  # Convert to int
+            'min_dist': float(min_dist),  # Convert to float
+            'avg_dist': float(avg_dist),  # Convert to float
+            'max_dist': float(max_dist),  # Convert to float
+            'std_dist': float(std_dist)  # Convert to float
         })
         
         print(f"{label:>8} {len(cluster_points):>10,} {min_dist:>10.2f} {avg_dist:>10.2f} {max_dist:>10.2f} {std_dist:>10.2f}")
@@ -243,6 +245,34 @@ def adaptive_clustering(points3D, camera_centers, initial_eps=2.0):
     return best_eps
 
 
+def save_filter_log(output_path, args, original_stats, filtered_stats, clustering_details, clusters_kept):
+    """Save filtering parameters and results to a log file."""
+    log_data = {
+        "timestamp": datetime.now().isoformat(),
+        "script": "filter_closest_blob.py",
+        "parameters": {
+            "input_path": args.input_path,
+            "output_path": args.output_path,
+            "eps": args.eps,
+            "min_samples": args.min_samples,
+            "auto_eps": args.auto_eps,
+            "keep_n_closest": args.keep_n_closest
+        },
+        "clustering_details": clustering_details,
+        "clusters_kept": clusters_kept,
+        "statistics": {
+            "original": original_stats,
+            "filtered": filtered_stats
+        }
+    }
+    
+    log_file = Path(output_path) / "filter_log.json"
+    with open(log_file, 'w') as f:
+        json.dump(log_data, f, indent=2)
+    
+    print(f"\nFilter log saved to: {log_file}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Filter COLMAP scene to keep only closest point cloud blob to cameras')
@@ -269,6 +299,13 @@ def main():
     print(f"  Points: {len(reconstruction.points3D):,}")
     print(f"  Images: {len(reconstruction.images)}")
     print(f"  Cameras: {len(reconstruction.cameras)}")
+    
+    # Store original statistics
+    original_stats = {
+        "points": len(reconstruction.points3D),
+        "images": len(reconstruction.images),
+        "cameras": len(reconstruction.cameras)
+    }
     
     if len(reconstruction.points3D) == 0:
         print("Error: No 3D points in reconstruction")
@@ -305,13 +342,29 @@ def main():
     # Analyze clusters
     cluster_stats = analyze_clusters_by_distance(coords, labels, camera_centers)
     
+    # Store clustering details
+    clustering_details = {
+        "eps_used": eps,
+        "min_samples": args.min_samples,
+        "total_clusters": n_clusters,
+        "noise_points": n_noise,
+        "cluster_stats": cluster_stats
+    }
+    
     # Find closest clusters
     valid_clusters = [c for c in cluster_stats if c['id'] != -1]
     valid_clusters.sort(key=lambda x: x['avg_dist'])
     
     clusters_to_keep = []
+    clusters_kept_info = []
     for i in range(min(args.keep_n_closest, len(valid_clusters))):
-        clusters_to_keep.append(valid_clusters[i]['id'])
+        cluster_id = valid_clusters[i]['id']
+        clusters_to_keep.append(cluster_id)
+        clusters_kept_info.append({
+            "cluster_id": int(cluster_id),
+            "size": int(valid_clusters[i]['size']),
+            "avg_distance": float(valid_clusters[i]['avg_dist'])
+        })
         print(f"\nKeeping cluster {valid_clusters[i]['id']} "
               f"({valid_clusters[i]['size']:,} points, "
               f"avg distance: {valid_clusters[i]['avg_dist']:.2f})")
@@ -339,6 +392,31 @@ def main():
     print(f"  Points: {len(reconstruction.points3D):,} (removed {len(points_to_remove):,})")
     print(f"  Images: {len(reconstruction.images)}")
     print(f"  Cameras: {len(reconstruction.cameras)}")
+    
+    # Collect filtered statistics
+    filtered_stats = {
+        "points": len(reconstruction.points3D),
+        "points_removed": len(points_to_remove),
+        "reduction_percentage": 100 * len(points_to_remove) / original_stats["points"] if original_stats["points"] > 0 else 0,
+        "images": len(reconstruction.images),
+        "cameras": len(reconstruction.cameras)
+    }
+    
+    # Calculate bounding box of remaining points
+    if len(reconstruction.points3D) > 0:
+        remaining_coords = np.array([p.xyz for p in reconstruction.points3D.values()])
+        bbox_min = np.min(remaining_coords, axis=0)
+        bbox_max = np.max(remaining_coords, axis=0)
+        bbox_size = bbox_max - bbox_min
+        
+        filtered_stats["bounding_box"] = {
+            "min": bbox_min.tolist(),
+            "max": bbox_max.tolist(),
+            "size": bbox_size.tolist()
+        }
+    
+    # Save filter log
+    save_filter_log(args.output_path, args, original_stats, filtered_stats, clustering_details, clusters_kept_info)
 
 
 if __name__ == "__main__":

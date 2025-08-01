@@ -31,6 +31,8 @@ import numpy as np
 import argparse
 from pathlib import Path
 import sys
+import json
+from datetime import datetime
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -158,6 +160,34 @@ def get_point_quality_stats(points3D):
     return errors, track_lengths
 
 
+def save_filter_log(output_path, args, original_stats, filtered_stats, method_details):
+    """Save filtering parameters and results to a log file."""
+    log_data = {
+        "timestamp": datetime.now().isoformat(),
+        "script": "filter_by_distance.py",
+        "parameters": {
+            "input_path": args.input_path,
+            "output_path": args.output_path,
+            "method": args.method,
+            "distance_factor": args.distance_factor,
+            "percentile": args.percentile,
+            "max_error": args.max_error,
+            "min_track_length": args.min_track_length
+        },
+        "method_details": method_details,
+        "statistics": {
+            "original": original_stats,
+            "filtered": filtered_stats
+        }
+    }
+    
+    log_file = Path(output_path) / "filter_log.json"
+    with open(log_file, 'w') as f:
+        json.dump(log_data, f, indent=2)
+    
+    print(f"\nFilter log saved to: {log_file}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Filter COLMAP scene by distance from camera trajectory')
@@ -192,6 +222,13 @@ def main():
     print(f"  Images: {len(reconstruction.images)}")
     print(f"  Cameras: {len(reconstruction.cameras)}")
     
+    # Store original statistics
+    original_stats = {
+        "points": len(reconstruction.points3D),
+        "images": len(reconstruction.images),
+        "cameras": len(reconstruction.cameras)
+    }
+    
     if len(reconstruction.points3D) == 0:
         print("Error: No 3D points in reconstruction")
         return
@@ -208,12 +245,30 @@ def main():
     print(f"\nExtracted {len(camera_centers)} camera centers")
     
     # Filter points based on method
+    method_details = {}
+    
     if args.method == 'trajectory':
         filtered_ids = filter_points_by_trajectory_distance(
             reconstruction.points3D, camera_centers, args.distance_factor)
+        trajectory_center, trajectory_radius = compute_camera_trajectory_bounds(camera_centers)
+        method_details = {
+            "trajectory_center": trajectory_center.tolist(),
+            "trajectory_radius": float(trajectory_radius),
+            "max_distance": float(trajectory_radius * args.distance_factor)
+        }
     elif args.method == 'percentile':
         filtered_ids = filter_points_by_percentile_distance(
             reconstruction.points3D, camera_centers, args.percentile)
+        # Calculate threshold distance
+        all_distances = []
+        for point in reconstruction.points3D.values():
+            min_dist = np.min(np.linalg.norm(camera_centers - point.xyz, axis=1))
+            all_distances.append(min_dist)
+        threshold = np.percentile(all_distances, args.percentile)
+        method_details = {
+            "percentile": args.percentile,
+            "distance_threshold": float(threshold)
+        }
     elif args.method == 'quality':
         # Filter by quality metrics only
         filtered_ids = []
@@ -221,6 +276,10 @@ def main():
             if (point.error <= args.max_error and 
                 point.track.length() >= args.min_track_length):
                 filtered_ids.append(point_id)
+        method_details = {
+            "max_error": args.max_error,
+            "min_track_length": args.min_track_length
+        }
     
     filtered_ids = set(filtered_ids)
     
@@ -252,6 +311,15 @@ def main():
     print(f"  Points: {len(reconstruction.points3D):,} (removed {len(points_to_remove):,})")
     print(f"  Reduction: {100 * len(points_to_remove) / len(all_point_ids):.1f}%")
     
+    # Collect filtered statistics
+    filtered_stats = {
+        "points": len(reconstruction.points3D),
+        "points_removed": len(points_to_remove),
+        "reduction_percentage": 100 * len(points_to_remove) / len(all_point_ids),
+        "images": len(reconstruction.images),
+        "cameras": len(reconstruction.cameras)
+    }
+    
     # Print bounding box of remaining points
     if len(reconstruction.points3D) > 0:
         coords = np.array([p.xyz for p in reconstruction.points3D.values()])
@@ -263,6 +331,16 @@ def main():
         print(f"  Min: [{bbox_min[0]:.2f}, {bbox_min[1]:.2f}, {bbox_min[2]:.2f}]")
         print(f"  Max: [{bbox_max[0]:.2f}, {bbox_max[1]:.2f}, {bbox_max[2]:.2f}]")
         print(f"  Size: [{bbox_size[0]:.2f}, {bbox_size[1]:.2f}, {bbox_size[2]:.2f}]")
+        
+        # Add bounding box to filtered stats
+        filtered_stats["bounding_box"] = {
+            "min": bbox_min.tolist(),
+            "max": bbox_max.tolist(),
+            "size": bbox_size.tolist()
+        }
+    
+    # Save filter log
+    save_filter_log(args.output_path, args, original_stats, filtered_stats, method_details)
 
 
 if __name__ == "__main__":
