@@ -99,23 +99,24 @@ python script/gradio_demo.py --port 7862
 From command line.
 ```
 docker compose exec edgs-app bash
-python script/fit_model_to_scene_full.py --video_path <your mp4 video> [--output_dir <EDGS output directory>]
+python script/fit_model_to_scene_full.py --video_path <your mp4 video> [--output_path <EDGS output directory>]
 ```
 
 > **🔧 Enhanced Video Processing**: The video processing pipeline now includes improved frame extraction with ffmpeg support, automatic handling of problematic video formats, and optimized COLMAP settings to ensure single unified reconstructions instead of fragmented models.
 
 **Additinal features:**
 
-1. **Skip COLMAP reconstruction** - Use existing COLMAP results to save time:
+1. **Use existing COLMAP reconstruction** - If the path exists, it will be used directly:
 ```bash
-python script/fit_model_to_scene_full.py --colmap_scene_dir <path_to_colmap_scene>
+python script/fit_model_to_scene_full.py --colmap_output_path <path_to_existing_colmap_scene>
 ```
 
-2. **Separate output directory** - Keep COLMAP input and EDGS output separate:
+2. **Specify custom output paths** - Control where COLMAP and EDGS outputs are saved:
 ```bash
 python script/fit_model_to_scene_full.py \
-    --colmap_scene_dir <colmap_scene> \
-    --output_dir <edgs_output_dir>
+    --video_path <video> \
+    --colmap_output_path <colmap_output> \
+    --output_path <edgs_output_path>
 ```
 
 3. **Memory-efficient configurations** - For GPUs with limited memory:
@@ -146,27 +147,27 @@ python script/fit_model_to_scene_full.py \
     --video_path data/my_video.mov \
     --config train_low_memory \
     --target_fps 3.0 \
-    --output_dir outputs/my_video_edgs
+    --output_path outputs/my_video_edgs
 
 # High-quality processing for complex scenes
 python script/fit_model_to_scene_full.py \
     --video_path data/forest_scene.mp4 \
     --config train_low_memory \
     --target_fps 4.0 \
-    --output_dir outputs/forest_high_quality
+    --output_path outputs/forest_high_quality
 
 # Process problematic/4K videos with conservative settings
 python script/fit_model_to_scene_full.py \
     --video_path data/4k_drone_video.MP4 \
     --config train_very_low_memory \
     --target_fps 2.0 \
-    --output_dir outputs/drone_4k
+    --output_path outputs/drone_4k
 
 # Use existing COLMAP scene with custom output location
 python script/fit_model_to_scene_full.py \
-    --colmap_scene_dir outputs/my_colmap_scene \
+    --colmap_output_path outputs/my_colmap_scene \
     --config train_low_memory \
-    --output_dir outputs/my_edgs_results
+    --output_path outputs/my_edgs_results
 ```
 
 #### Option C

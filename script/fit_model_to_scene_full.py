@@ -66,16 +66,10 @@ parser.add_argument(
     help="Path to the input video file.",
 )
 parser.add_argument(
-    "--outputs_dir",
-    type=str,
-    default=os.path.join(project_root, "outputs"),  # Use project_root
-    help="Base directory where processed COLMAP scenes will be stored.",
-)
-parser.add_argument(
-    "--colmap_scene_dir",
+    "--colmap_output_path",
     type=str,
     default=None,
-    help="Path to existing COLMAP scene directory. If provided, skips video processing and uses this scene directly.",
+    help="Path to COLMAP scene directory. If it exists, uses it directly. If not, creates COLMAP output here when processing video.",
 )
 parser.add_argument(
     "--config",
@@ -84,10 +78,10 @@ parser.add_argument(
     help="Config name to use (e.g., 'train', 'train_low_memory', 'train_very_low_memory'). Default: train",
 )
 parser.add_argument(
-    "--output_dir",
+    "--output_path",
     type=str,
     default=None,
-    help="Directory to save EDGS training results. If not specified, creates 'models' subfolder in COLMAP scene or outputs_dir.",
+    help="Directory to save EDGS training results. If not specified, creates 'models' subfolder in COLMAP scene or colmap_output_path.",
 )
 parser.add_argument(
     "--target_fps",
@@ -134,32 +128,28 @@ print(OmegaConf.to_yaml(cfg))
 # # 3. Init input parameters
 
 # ## 3.1 Set up scene directory
-if args.colmap_scene_dir:
-    # Use existing COLMAP scene
-    if not os.path.exists(args.colmap_scene_dir):
-        print(f"Error: COLMAP scene directory does not exist: {args.colmap_scene_dir}")
-        sys.exit(1)
-    
-    # Verify it's a valid COLMAP scene
-    sparse_dir = os.path.join(args.colmap_scene_dir, "sparse", "0")
-    if not os.path.exists(sparse_dir):
-        print(f"Error: No sparse reconstruction found at {sparse_dir}")
-        sys.exit(1)
-    
-    required_files = ["cameras.bin", "images.bin", "points3D.bin"]
-    missing_files = [f for f in required_files if not os.path.exists(os.path.join(sparse_dir, f))]
-    if missing_files:
-        print(f"Error: Missing COLMAP files: {missing_files}")
-        sys.exit(1)
-    
-    scene_dir = args.colmap_scene_dir
-    print(f"Using existing COLMAP scene: {scene_dir}")
-    
-else:
+# Check if colmap_output_path exists and is a valid COLMAP scene
+use_existing_colmap = False
+if args.colmap_output_path and os.path.exists(args.colmap_output_path):
+    # Check if it's a valid COLMAP scene
+    sparse_dir = os.path.join(args.colmap_output_path, "sparse", "0")
+    if os.path.exists(sparse_dir):
+        required_files = ["cameras.bin", "images.bin", "points3D.bin"]
+        missing_files = [f for f in required_files if not os.path.exists(os.path.join(sparse_dir, f))]
+        if not missing_files:
+            use_existing_colmap = True
+            scene_dir = args.colmap_output_path
+            print(f"Using existing COLMAP scene: {scene_dir}")
+
+if not use_existing_colmap:
     # Process video to create COLMAP scene
     if not os.path.exists(args.video_path):
         print(f"Error: Video file does not exist: {args.video_path}")
         sys.exit(1)
+    
+    # Set default colmap_output_path if not specified
+    if not args.colmap_output_path:
+        args.colmap_output_path = os.path.join(project_root, "outputs")
         
     print(f"Starting video processing for: {args.video_path}")
     try:
@@ -169,7 +159,7 @@ else:
             args.video_path,
             cfg.init_wC.num_refs,  # Assuming you added this arg
             max_size=1024,  # Or make it an arg
-            base_work_dir=args.outputs_dir,  # Assuming you added this arg
+            base_work_dir=args.colmap_output_path,  # Assuming you added this arg
             use_automatic_mode=True,  # Use automatic reconstructor-like settings
             target_fps=args.target_fps,  # Pass target FPS for frame extraction
         )
@@ -184,9 +174,9 @@ else:
 cfg.gs.dataset.source_path = scene_dir
 
 # Determine output directory for EDGS training results
-if args.output_dir:
+if args.output_path:
     # Use specified output directory
-    model_path = args.output_dir
+    model_path = args.output_path
 else:
     # Default behavior: create models subfolder in scene directory
     model_path = os.path.join(scene_dir, "models")
