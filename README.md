@@ -154,12 +154,30 @@ python script/fit_model_to_scene_full.py --video_path <video> --max_image_size 1
 
 > **📐 max_image_size Parameter**: This refers to the maximum dimension (width OR height). Images larger than this value are resized while preserving aspect ratio. For example, a 4K image (3840x2160) with `--max_image_size 1920` becomes 1920x1080. Use `-1` to keep the original resolution.
 
+6. **COLMAP memory/quality profiles** - Control COLMAP reconstruction settings:
+```bash
+# High accuracy (best quality, requires 16GB+ memory)
+python script/fit_model_to_scene_full.py --video_path <video> --colmap_config high_accuracy
+
+# Balanced quality and memory usage (recommended for 8-12GB memory)
+python script/fit_model_to_scene_full.py --video_path <video> --colmap_config balanced
+
+# Low memory usage (good for 6-8GB memory, default)
+python script/fit_model_to_scene_full.py --video_path <video> --colmap_config low_memory
+
+# Very low memory usage (minimal memory, 4-6GB memory)
+python script/fit_model_to_scene_full.py --video_path <video> --colmap_config very_low_memory
+```
+
+> **⚙️ COLMAP Configuration Profiles**: These profiles control the trade-off between reconstruction quality and memory usage by adjusting SIFT feature extraction, matching, and mapping parameters. Use `very_low_memory` if you encounter "Killed" errors during COLMAP processing.
+
 **Examples:**
 ```bash
 # Process new video with low memory settings and custom frame rate
 python script/fit_model_to_scene_full.py \
     --video_path data/my_video.mov \
     --config train_low_memory \
+    --colmap_config low_memory \
     --target_fps 3.0 \
     --max_image_size -1 \
     --output_path outputs/my_video_edgs
@@ -167,6 +185,7 @@ python script/fit_model_to_scene_full.py \
 # High-quality processing for complex scenes at original resolution
 python script/fit_model_to_scene_full.py \
     --video_path data/complex_scene.mp4 \
+    --colmap_config high_accuracy \
     --target_fps 5.0 \
     --max_image_size -1 \
     --output_path outputs/complex_scene_edgs
@@ -175,6 +194,7 @@ python script/fit_model_to_scene_full.py \
 python script/fit_model_to_scene_full.py \
     --video_path data/test_scene.mp4 \
     --config train_low_memory \
+    --colmap_config very_low_memory \
     --target_fps 2.0 \
     --max_image_size 1024 \
     --output_path outputs/test_scene_fast
@@ -183,6 +203,7 @@ python script/fit_model_to_scene_full.py \
 python script/fit_model_to_scene_full.py \
     --video_path data/4k_drone_video.MP4 \
     --config train_very_low_memory \
+    --colmap_config very_low_memory \
     --target_fps 2.0 \
     --max_image_size 1920 \
     --output_path outputs/drone_4k

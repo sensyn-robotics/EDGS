@@ -1,0 +1,40 @@
+# COLMAP Configuration: Balanced
+# Good quality with moderate memory usage
+# Recommended for: Most use cases, mid-range GPUs (8-12GB)
+
+sift_extraction:
+  max_num_features: 8192       # Balanced feature count
+  max_image_size: 2048         # Moderate resolution
+  first_octave: -1             # Include detailed features
+  num_octaves: 4
+  octave_resolution: 3
+  peak_threshold: 0.004        # Moderate sensitivity
+  edge_threshold: 10
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  max_ratio: 0.8
+  max_distance: 0.75
+  cross_check: true
+  max_num_matches: 16384
+
+pipeline:
+  min_num_matches: 5
+  multiple_models: false
+  max_num_models: 1
+  max_model_overlap: 100
+  min_model_size: 50
+  extract_colors: true
+  num_threads: -1
+
+mapper:
+  init_min_num_inliers: 15
+  init_max_error: 6.0
+  init_min_tri_angle: 2.0
+  abs_pose_min_num_inliers: 15
+  abs_pose_max_error: 10.0
+  abs_pose_min_inlier_ratio: 0.15
+  filter_max_reproj_error: 6.0
+  filter_min_tri_angle: 0.5

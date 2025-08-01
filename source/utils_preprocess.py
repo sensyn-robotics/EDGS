@@ -3,6 +3,7 @@
 # Afterwards scene is constructed
 import os
 import time
+import yaml
 
 import cv2
 import numpy as np
@@ -11,6 +12,82 @@ from matplotlib import pyplot as plt
 from moviepy import VideoFileClip
 from PIL import Image
 from tqdm import tqdm
+
+
+def load_colmap_config(config_name="balanced"):
+    """
+    Load COLMAP configuration from YAML file.
+    
+    Args:
+        config_name (str): Configuration profile name. Options:
+            - 'high_accuracy': Best quality, high memory usage
+            - 'balanced': Good quality, moderate memory usage (default)
+            - 'low_memory': Reduced quality, low memory usage
+            - 'very_low_memory': Minimal quality, very low memory usage
+    
+    Returns:
+        dict: Configuration dictionary with SIFT and mapping parameters
+    """
+    # Get the project root directory (assuming this file is in source/)
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_file = os.path.join(project_root, "configs", f"colmap_{config_name}.yaml")
+    
+    if not os.path.exists(config_file):
+        print(f"Warning: Config file {config_file} not found, using balanced profile")
+        config_file = os.path.join(project_root, "configs", "colmap_balanced.yaml")
+    
+    try:
+        with open(config_file, 'r') as f:
+            config = yaml.safe_load(f)
+        print(f"Loaded COLMAP config: {config_name} from {config_file}")
+        return config
+    except Exception as e:
+        print(f"Error loading config {config_file}: {e}")
+        print("Using fallback default configuration")
+        return get_default_colmap_config()
+
+
+def get_default_colmap_config():
+    """Fallback configuration if YAML files are not available"""
+    return {
+        'sift_extraction': {
+            'max_num_features': 4096,
+            'max_image_size': 1920,
+            'first_octave': 0,
+            'num_octaves': 3,
+            'octave_resolution': 3,
+            'peak_threshold': 0.008,
+            'edge_threshold': 15,
+            'estimate_affine_shape': False,
+            'domain_size_pooling': False,
+            'upright': False,
+        },
+        'sift_matching': {
+            'max_ratio': 0.8,
+            'max_distance': 0.75,
+            'cross_check': True,
+            'max_num_matches': 8192,
+        },
+        'pipeline': {
+            'min_num_matches': 5,
+            'multiple_models': False,
+            'max_num_models': 1,
+            'max_model_overlap': 100,
+            'min_model_size': 30,
+            'extract_colors': True,
+            'num_threads': 4,
+        },
+        'mapper': {
+            'init_min_num_inliers': 12,
+            'init_max_error': 8.0,
+            'init_min_tri_angle': 1.5,
+            'abs_pose_min_num_inliers': 12,
+            'abs_pose_max_error': 12.0,
+            'abs_pose_min_inlier_ratio': 0.15,
+            'filter_max_reproj_error': 8.0,
+            'filter_min_tri_angle': 0.25,
+        }
+    }
 
 
 def get_rotation_moviepy(video_path):
@@ -525,7 +602,7 @@ def create_fallback_reconstruction(image_dir, sparse_path):
     print("⚠️  Note: This is a basic reconstruction with assumed camera positions. Results may be limited.")
 
 
-def run_colmap_on_scene(scene_dir, force_pinhole=True, use_automatic_mode=False):
+def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="balanced"):
     """
     Runs feature extraction, matching, and mapping on all images inside scene_dir/images using pycolmap.
     Forces PINHOLE camera model to avoid distortion issues.
@@ -533,12 +610,18 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, use_automatic_mode=False)
     Args:
         scene_dir (str): Path to scene directory containing 'images' folder.
         force_pinhole (bool): If True, forces PINHOLE camera model during reconstruction.
-        use_automatic_mode (bool): If True, use settings similar to automatic_reconstructor.
+        colmap_config (str): COLMAP configuration profile to use. Options:
+            - 'high_accuracy': Best quality, high memory usage
+            - 'balanced': Good quality, moderate memory usage (default)
+            - 'low_memory': Reduced quality, low memory usage  
+            - 'very_low_memory': Minimal quality, very low memory usage
     """
     start_time = time.time()
     print(f"Running COLMAP pipeline on all images inside {scene_dir}")
-    if use_automatic_mode:
-        print("Using automatic_reconstructor-like settings...")
+    print(f"Using COLMAP configuration profile: {colmap_config}")
+
+    # Load configuration
+    config = load_colmap_config(colmap_config)
 
     # Setup paths
     database_path = os.path.join(scene_dir, "database.db")
@@ -548,31 +631,8 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, use_automatic_mode=False)
     # Make sure output directories exist
     os.makedirs(sparse_path, exist_ok=True)
 
-    # Step 1: Feature Extraction with automatic_reconstructor-like settings
-    if use_automatic_mode:
-        # Automatic reconstructor uses these defaults
-        sift_options = {
-            "max_num_features": 16384,  # Even higher for forest scenes
-            "max_image_size": 3200,     # Much higher resolution
-            "first_octave": -1,         # More detailed features
-            "num_octaves": 4,
-            "octave_resolution": 3,
-            "peak_threshold": 0.001,    # Very sensitive feature detection
-            "edge_threshold": 10,       # Standard edge threshold
-            "estimate_affine_shape": False,
-            "domain_size_pooling": False,
-            "upright": False,
-        }
-    else:
-        sift_options = {
-            "max_num_features": 8192,
-            "max_image_size": 1600,
-            "first_octave": -1,
-            "num_octaves": 4,
-            "octave_resolution": 3,
-            "peak_threshold": 0.005,
-            "edge_threshold": 20,
-        }
+    # Step 1: Feature Extraction using configuration
+    sift_options = config['sift_extraction']
     
     pycolmap.extract_features(
         database_path,
@@ -581,99 +641,66 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, use_automatic_mode=False)
     )
     print(f"Finished feature extraction in {(time.time() - start_time):.2f}s.")
 
-    # Step 2: Feature Matching
-    if use_automatic_mode:
-        # Try vocabulary tree matching first (similar to automatic_reconstructor)
-        try:
-            print("Attempting vocabulary tree matching...")
-            # Note: This requires a vocabulary tree file which may not be available
-            # Fall back to sequential matching if not available
-            matching_options = pycolmap.SiftMatchingOptions()
-            matching_options.max_ratio = 0.8
-            matching_options.max_distance = 0.7
-            matching_options.cross_check = True
-            matching_options.max_num_matches = 32768
-            
-            # Use sequential matching for forest scenes (better for continuous motion)
-            pycolmap.match_sequential(database_path, 
-                                    sift_options=matching_options,
-                                    overlap=30,  # Match with 30 neighboring frames for maximum overlap
-                                    quadratic_overlap=True)  # Also match quadratically
-            print("Sequential matching completed.")
-            
-            # Also do exhaustive matching for loop closure
-            pycolmap.match_exhaustive(database_path, sift_options=matching_options)
-            print("Exhaustive matching completed.")
-        except Exception as e:
-            print(f"Advanced matching failed, using exhaustive: {e}")
-            sift_matching_options = pycolmap.SiftMatchingOptions()
-            sift_matching_options.max_ratio = 0.8
-            sift_matching_options.max_distance = 0.7
-            sift_matching_options.cross_check = True
-            pycolmap.match_exhaustive(database_path, sift_options=sift_matching_options)
-    else:
-        sift_matching_options = pycolmap.SiftMatchingOptions()
-        sift_matching_options.max_ratio = 0.9
-        sift_matching_options.max_distance = 0.8
-        sift_matching_options.cross_check = True
-        pycolmap.match_exhaustive(database_path, sift_options=sift_matching_options)
+    # Step 2: Feature Matching using configuration
+    matching_config = config['sift_matching']
+    matching_options = pycolmap.SiftMatchingOptions()
+    matching_options.max_ratio = matching_config['max_ratio']
+    matching_options.max_distance = matching_config['max_distance']
+    matching_options.cross_check = matching_config['cross_check']
+    if 'max_num_matches' in matching_config:
+        matching_options.max_num_matches = matching_config['max_num_matches']
+    
+    # Use sequential + exhaustive matching for better coverage
+    try:
+        print("Running sequential matching...")
+        pycolmap.match_sequential(database_path, 
+                                sift_options=matching_options,
+                                overlap=20,  # Match with neighboring frames
+                                quadratic_overlap=False)
+        print("Sequential matching completed.")
+        
+        print("Running exhaustive matching...")
+        pycolmap.match_exhaustive(database_path, sift_options=matching_options)
+        print("Exhaustive matching completed.")
+    except Exception as e:
+        print(f"Matching failed: {e}")
+        print("Trying exhaustive matching only...")
+        pycolmap.match_exhaustive(database_path, sift_options=matching_options)
     
     print(f"Finished feature matching in {(time.time() - start_time):.2f}s.")
 
-    # Step 3: Mapping with automatic_reconstructor-like parameters
+    # Step 3: Mapping using configuration
+    pipeline_config = config['pipeline']
+    mapper_config = config['mapper']
+    
     pipeline_options = pycolmap.IncrementalPipelineOptions()
     
-    if use_automatic_mode:
-        # Force single reconstruction for forest scenes
-        pipeline_options.min_num_matches = 5           # Very low threshold to connect everything
-        pipeline_options.multiple_models = False        # Disable multiple models entirely!
-        pipeline_options.max_num_models = 1            # Force single model
-        pipeline_options.max_model_overlap = 100       # Maximum overlap
-        pipeline_options.min_model_size = 50           # Require large component
-        pipeline_options.extract_colors = True
-        pipeline_options.num_threads = -1              # Use all available threads
-        
-        # Mapper options optimized for forest/complex scenes
-        pipeline_options.mapper.init_min_num_inliers = 15    # Lower threshold for connection
-        pipeline_options.mapper.init_max_error = 8.0         # More lenient error tolerance
-        pipeline_options.mapper.init_min_tri_angle = 2.0     # More lenient triangulation angle
-        # pipeline_options.mapper.init_max_reg_trials = 3      # Not available in this pycolmap version
-        
-        pipeline_options.mapper.abs_pose_min_num_inliers = 15    # More lenient for connection
-        pipeline_options.mapper.abs_pose_max_error = 12.0       # More lenient error
-        pipeline_options.mapper.abs_pose_min_inlier_ratio = 0.15 # Lower ratio requirement
-        # pipeline_options.mapper.abs_pose_min_num_correspondences = 3  # Not available in this pycolmap version
-        
-        pipeline_options.mapper.filter_max_reproj_error = 8.0    # More lenient filtering
-        pipeline_options.mapper.filter_min_tri_angle = 0.25     # More lenient angle
-        
-        # pipeline_options.mapper.local_ba_num_images = 6  # May not be available
-        # pipeline_options.mapper.local_ba_max_num_iterations = 25  # May not be available
-        
-        # Bundle adjustment refinement settings (may not all be available)
-        try:
-            pipeline_options.mapper.global_ba_refine_focal_length = True
-            pipeline_options.mapper.global_ba_refine_principal_point = False
-            pipeline_options.mapper.global_ba_refine_extra_params = False
-        except AttributeError:
-            pass  # Skip if not available
-    else:
-        # Original settings
-        pipeline_options.min_num_matches = 8
-        pipeline_options.multiple_models = True
-        pipeline_options.max_num_models = 50
-        pipeline_options.max_model_overlap = 20
-        pipeline_options.min_model_size = 3
-        pipeline_options.extract_colors = True
-        pipeline_options.num_threads = 8
-        
-        pipeline_options.mapper.init_min_num_inliers = 15
-        pipeline_options.mapper.init_max_error = 12.0
-        pipeline_options.mapper.init_min_tri_angle = 2.0
-        pipeline_options.mapper.abs_pose_min_num_inliers = 15
-        pipeline_options.mapper.abs_pose_max_error = 12.0
-        pipeline_options.mapper.filter_max_reproj_error = 8.0
-        pipeline_options.mapper.filter_min_tri_angle = 1.5
+    # Set pipeline options from configuration
+    pipeline_options.min_num_matches = pipeline_config['min_num_matches']
+    pipeline_options.multiple_models = pipeline_config['multiple_models']
+    pipeline_options.max_num_models = pipeline_config['max_num_models']
+    pipeline_options.max_model_overlap = pipeline_config['max_model_overlap']
+    pipeline_options.min_model_size = pipeline_config['min_model_size']
+    pipeline_options.extract_colors = pipeline_config['extract_colors']
+    pipeline_options.num_threads = pipeline_config['num_threads']
+    
+    # Set mapper options from configuration
+    pipeline_options.mapper.init_min_num_inliers = mapper_config['init_min_num_inliers']
+    pipeline_options.mapper.init_max_error = mapper_config['init_max_error']
+    pipeline_options.mapper.init_min_tri_angle = mapper_config['init_min_tri_angle']
+    pipeline_options.mapper.abs_pose_min_num_inliers = mapper_config['abs_pose_min_num_inliers']
+    pipeline_options.mapper.abs_pose_max_error = mapper_config['abs_pose_max_error']
+    pipeline_options.mapper.abs_pose_min_inlier_ratio = mapper_config['abs_pose_min_inlier_ratio']
+    pipeline_options.mapper.filter_max_reproj_error = mapper_config['filter_max_reproj_error']
+    pipeline_options.mapper.filter_min_tri_angle = mapper_config['filter_min_tri_angle']
+    
+    # Bundle adjustment refinement settings (try to set if available)
+    try:
+        pipeline_options.mapper.global_ba_refine_focal_length = True
+        pipeline_options.mapper.global_ba_refine_principal_point = False
+        pipeline_options.mapper.global_ba_refine_extra_params = False
+    except AttributeError:
+        pass  # Skip if not available in this pycolmap version
     
     # Note: force_pinhole will be applied after reconstruction
 
@@ -994,6 +1021,7 @@ def orchestrate_video_to_colmap_scene(
     base_work_dir="../outputs/processed_scenes",
     use_automatic_mode=False,
     target_fps=3.0,
+    colmap_config="low_memory",
 ):
     """
     Orchestrates the full video/image folder preprocessing pipeline:
@@ -1080,7 +1108,7 @@ def orchestrate_video_to_colmap_scene(
         return [], None
 
     # Run COLMAP with PINHOLE camera model enforced
-    run_colmap_on_scene(scene_dir, force_pinhole=True, use_automatic_mode=use_automatic_mode)  # Force PINHOLE to avoid distortion
+    run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config=colmap_config)
 
     print(f"COLMAP processing complete for {scene_dir}")
     return selected_frames_data, scene_dir

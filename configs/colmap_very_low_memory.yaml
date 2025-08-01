@@ -1,0 +1,40 @@
+# COLMAP Configuration: Very Low Memory
+# Minimal memory usage for severely constrained systems
+# Recommended for: Very large datasets, GPUs with 4-6GB memory, high-resolution inputs
+
+sift_extraction:
+  max_num_features: 2048       # Minimal feature count
+  max_image_size: 1024         # Significantly reduced resolution
+  first_octave: 0              # Skip super-resolution
+  num_octaves: 3               # Minimum octaves
+  octave_resolution: 2         # Lower resolution per octave
+  peak_threshold: 0.015        # Much higher threshold = far fewer features
+  edge_threshold: 20           # Aggressive edge filtering
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  max_ratio: 0.9               # More lenient matching
+  max_distance: 0.85
+  cross_check: true
+  max_num_matches: 4096        # Minimal matches
+
+pipeline:
+  min_num_matches: 3           # Very low threshold
+  multiple_models: false
+  max_num_models: 1
+  max_model_overlap: 100
+  min_model_size: 20           # Allow very small models
+  extract_colors: true
+  num_threads: 2               # Minimal threads
+
+mapper:
+  init_min_num_inliers: 8      # Very lenient requirements
+  init_max_error: 12.0
+  init_min_tri_angle: 1.0
+  abs_pose_min_num_inliers: 8
+  abs_pose_max_error: 15.0
+  abs_pose_min_inlier_ratio: 0.10
+  filter_max_reproj_error: 12.0
+  filter_min_tri_angle: 0.25

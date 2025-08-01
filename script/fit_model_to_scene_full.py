@@ -95,6 +95,13 @@ parser.add_argument(
     default=-1,
     help="Maximum image dimension (width or height). Images larger than this will be resized while preserving aspect ratio. For example, a 4K image (3840x2160) with max_image_size=1920 becomes 1920x1080. Use -1 to keep original resolution. Default: -1",
 )
+parser.add_argument(
+    "--colmap_config",
+    type=str,
+    default="low_memory",
+    choices=["high_accuracy", "balanced", "low_memory", "very_low_memory"],
+    help="COLMAP configuration profile for memory vs accuracy trade-off. Options: high_accuracy (best quality, high memory), balanced (good quality, moderate memory), low_memory (reduced quality, low memory), very_low_memory (minimal quality, very low memory). Default: low_memory",
+)
 args = parser.parse_args()
 # --- End argument parsing ---
 
@@ -171,6 +178,7 @@ if not use_existing_colmap:
             base_work_dir=args.colmap_output_path,  # Assuming you added this arg
             use_automatic_mode=True,  # Use automatic reconstructor-like settings
             target_fps=args.target_fps,  # Pass target FPS for frame extraction
+            colmap_config=args.colmap_config,  # Pass COLMAP configuration
         )
         if scene_dir is None:
             print(f"Failed to process video {args.video_path}. Exiting.")

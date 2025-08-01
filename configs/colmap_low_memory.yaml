@@ -1,0 +1,40 @@
+# COLMAP Configuration: Low Memory
+# Optimized for memory-constrained systems
+# Recommended for: Large datasets, GPUs with 6-8GB memory
+
+sift_extraction:
+  max_num_features: 4096       # Reduced feature count to save memory
+  max_image_size: 1920         # Lower resolution to reduce memory usage
+  first_octave: 0              # Skip super-resolution to save memory
+  num_octaves: 3               # Fewer octaves = less memory
+  octave_resolution: 3
+  peak_threshold: 0.008        # Higher threshold = fewer features
+  edge_threshold: 15           # Slightly more aggressive edge filtering
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  max_ratio: 0.85              # Slightly more lenient
+  max_distance: 0.8
+  cross_check: true
+  max_num_matches: 8192        # Fewer matches to save memory
+
+pipeline:
+  min_num_matches: 5
+  multiple_models: false
+  max_num_models: 1
+  max_model_overlap: 100
+  min_model_size: 30           # Allow smaller models
+  extract_colors: true
+  num_threads: 4               # Limit threads to reduce memory pressure
+
+mapper:
+  init_min_num_inliers: 12     # Slightly more lenient
+  init_max_error: 8.0
+  init_min_tri_angle: 1.5
+  abs_pose_min_num_inliers: 12
+  abs_pose_max_error: 12.0
+  abs_pose_min_inlier_ratio: 0.15
+  filter_max_reproj_error: 8.0
+  filter_min_tri_angle: 0.25

@@ -1,0 +1,40 @@
+# COLMAP Configuration: High Accuracy
+# Best quality reconstruction, higher memory usage
+# Recommended for: Small to medium datasets, high-end GPUs (16GB+)
+
+sift_extraction:
+  max_num_features: 16384      # Very high feature count for best quality
+  max_image_size: 3200         # High resolution processing
+  first_octave: -1             # Include super-resolution features for detail
+  num_octaves: 4               # Full octave range
+  octave_resolution: 3
+  peak_threshold: 0.001        # Very sensitive feature detection
+  edge_threshold: 10           # Standard edge filtering
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  max_ratio: 0.8               # Strict ratio test
+  max_distance: 0.7            # Strict distance threshold
+  cross_check: true
+  max_num_matches: 32768       # Allow many matches
+
+pipeline:
+  min_num_matches: 5           # Low threshold for connections
+  multiple_models: false       # Force single model
+  max_num_models: 1
+  max_model_overlap: 100
+  min_model_size: 50
+  extract_colors: true
+  num_threads: -1              # Use all threads
+
+mapper:
+  init_min_num_inliers: 15
+  init_max_error: 4.0          # Strict error tolerance
+  init_min_tri_angle: 2.0
+  abs_pose_min_num_inliers: 15
+  abs_pose_max_error: 8.0
+  abs_pose_min_inlier_ratio: 0.15
+  filter_max_reproj_error: 4.0  # Strict filtering
+  filter_min_tri_angle: 0.5
