@@ -140,6 +140,20 @@ python script/fit_model_to_scene_full.py --video_path <video> --target_fps 5.0
 python script/fit_model_to_scene_full.py --video_path <video> --target_fps 1.5
 ```
 
+5. **Image resolution control** - Control output image dimensions:
+```bash
+# Keep original resolution (default, recommended for high-quality reconstruction)
+python script/fit_model_to_scene_full.py --video_path <video> --max_image_size -1
+
+# Resize to 1920px max dimension (4K→1080p, preserves aspect ratio)
+python script/fit_model_to_scene_full.py --video_path <video> --max_image_size 1920
+
+# Resize to 1024px max dimension (faster processing, lower quality)
+python script/fit_model_to_scene_full.py --video_path <video> --max_image_size 1024
+```
+
+> **📐 max_image_size Parameter**: This refers to the maximum dimension (width OR height). Images larger than this value are resized while preserving aspect ratio. For example, a 4K image (3840x2160) with `--max_image_size 1920` becomes 1920x1080. Use `-1` to keep the original resolution.
+
 **Examples:**
 ```bash
 # Process new video with low memory settings and custom frame rate
@@ -147,20 +161,30 @@ python script/fit_model_to_scene_full.py \
     --video_path data/my_video.mov \
     --config train_low_memory \
     --target_fps 3.0 \
+    --max_image_size -1 \
     --output_path outputs/my_video_edgs
 
-# High-quality processing for complex scenes
+# High-quality processing for complex scenes at original resolution
 python script/fit_model_to_scene_full.py \
-    --video_path data/forest_scene.mp4 \
-    --config train_low_memory \
-    --target_fps 4.0 \
-    --output_path outputs/forest_high_quality
+    --video_path data/complex_scene.mp4 \
+    --target_fps 5.0 \
+    --max_image_size -1 \
+    --output_path outputs/complex_scene_edgs
 
-# Process problematic/4K videos with conservative settings
+# Fast processing with reduced resolution for testing
+python script/fit_model_to_scene_full.py \
+    --video_path data/test_scene.mp4 \
+    --config train_low_memory \
+    --target_fps 2.0 \
+    --max_image_size 1024 \
+    --output_path outputs/test_scene_fast
+
+# Process 4K videos with conservative settings (resize to 1080p)
 python script/fit_model_to_scene_full.py \
     --video_path data/4k_drone_video.MP4 \
     --config train_very_low_memory \
     --target_fps 2.0 \
+    --max_image_size 1920 \
     --output_path outputs/drone_4k
 
 # Use existing COLMAP scene with custom output location

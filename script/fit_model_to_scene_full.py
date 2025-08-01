@@ -89,6 +89,12 @@ parser.add_argument(
     default=3.0,
     help="Target frames per second for video extraction. Higher values extract more frames. Default: 3.0",
 )
+parser.add_argument(
+    "--max_image_size",
+    type=int,
+    default=-1,
+    help="Maximum image dimension (width or height). Images larger than this will be resized while preserving aspect ratio. For example, a 4K image (3840x2160) with max_image_size=1920 becomes 1920x1080. Use -1 to keep original resolution. Default: -1",
+)
 args = parser.parse_args()
 # --- End argument parsing ---
 
@@ -155,10 +161,13 @@ if not use_existing_colmap:
     try:
         # The first return value 'images_data' might not be directly used by the trainer
         # if the Scene object loads everything from the COLMAP directory.
+        # Use original image size if max_image_size is -1
+        max_size = args.max_image_size if args.max_image_size > 0 else 999999
+        
         _, scene_dir = orchestrate_video_to_colmap_scene(
             args.video_path,
             cfg.init_wC.num_refs,  # Assuming you added this arg
-            max_size=1024,  # Or make it an arg
+            max_size=max_size,  # Use configurable size
             base_work_dir=args.colmap_output_path,  # Assuming you added this arg
             use_automatic_mode=True,  # Use automatic reconstructor-like settings
             target_fps=args.target_fps,  # Pass target FPS for frame extraction
