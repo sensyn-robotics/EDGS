@@ -65,7 +65,7 @@ def get_camera_centers(reconstruction):
     return np.array(camera_centers)
 
 
-def compute_camera_trajectory_bounds(camera_centers, expansion_factor=2.0):
+def compute_camera_trajectory_bounds(camera_centers):
     """Compute bounding region around camera trajectory."""
     # Find trajectory center and extent
     center = np.mean(camera_centers, axis=0)
@@ -74,16 +74,22 @@ def compute_camera_trajectory_bounds(camera_centers, expansion_factor=2.0):
     distances = np.linalg.norm(camera_centers - center, axis=1)
     max_cam_distance = np.max(distances)
     
-    # Expand the region
-    trajectory_radius = max_cam_distance * expansion_factor
+    # Use the actual camera trajectory radius without expansion
+    trajectory_radius = max_cam_distance
     
     return center, trajectory_radius
 
 
 def filter_points_by_trajectory_distance(points3D, camera_centers, max_distance_factor=3.0):
     """
-    Filter points based on distance from camera trajectory.
-    Keeps points within max_distance_factor * camera_trajectory_radius
+    Filter points based on distance from camera trajectory center.
+    Keeps points within max_distance_factor * camera_trajectory_radius from the trajectory center.
+    
+    Args:
+        points3D: Dictionary of 3D points
+        camera_centers: Array of camera positions
+        max_distance_factor: Multiplier for camera trajectory radius (default: 3.0)
+                           Points beyond this factor * trajectory radius are filtered out
     """
     trajectory_center, trajectory_radius = compute_camera_trajectory_bounds(camera_centers)
     max_distance = trajectory_radius * max_distance_factor
@@ -186,6 +192,44 @@ def save_filter_log(output_path, args, original_stats, filtered_stats, method_de
         json.dump(log_data, f, indent=2)
     
     print(f"\nFilter log saved to: {log_file}")
+
+
+def write_ply(filename, points3D):
+    """Write filtered points to PLY file for visualization."""
+    if len(points3D) == 0:
+        print(f"Warning: No points to write to PLY file")
+        return
+        
+    # Collect point data
+    xyz = []
+    rgb = []
+    for point in points3D.values():
+        xyz.append(point.xyz)
+        rgb.append(point.color)
+    
+    xyz = np.array(xyz)
+    rgb = np.array(rgb, dtype=np.uint8)
+    
+    # Write PLY header
+    num_points = len(xyz)
+    with open(filename, 'w') as f:
+        f.write("ply\n")
+        f.write("format ascii 1.0\n")
+        f.write(f"element vertex {num_points}\n")
+        f.write("property float x\n")
+        f.write("property float y\n")
+        f.write("property float z\n")
+        f.write("property uchar red\n")
+        f.write("property uchar green\n")
+        f.write("property uchar blue\n")
+        f.write("end_header\n")
+        
+        # Write point data
+        for i in range(num_points):
+            f.write(f"{xyz[i, 0]:.6f} {xyz[i, 1]:.6f} {xyz[i, 2]:.6f} ")
+            f.write(f"{rgb[i, 0]} {rgb[i, 1]} {rgb[i, 2]}\n")
+    
+    print(f"Saved {num_points} points to: {filename}")
 
 
 def main():
@@ -306,6 +350,11 @@ def main():
     # Write filtered reconstruction
     print(f"\nWriting filtered reconstruction to {args.output_path}")
     reconstruction.write(args.output_path)
+    
+    # Write PLY file for visualization
+    ply_file = Path(args.output_path) / "sparse" / "0" / "points3D_filtered.ply"
+    ply_file.parent.mkdir(parents=True, exist_ok=True)
+    write_ply(ply_file, reconstruction.points3D)
     
     print(f"\nFiltered scene statistics:")
     print(f"  Points: {len(reconstruction.points3D):,} (removed {len(points_to_remove):,})")

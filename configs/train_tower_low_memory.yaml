@@ -8,7 +8,7 @@ defaults:
 # EDGS core - no densification
 train:
   no_densify: True  # EDGS principle
-  gs_epochs: 30000  
+  gs_epochs: 60000  
   reduce_opacity: True
   max_lr: True
 
@@ -36,9 +36,9 @@ gs:
 # Better initialization within memory limits
 init_wC:
   matches_per_ref: 15000    # Good coverage without OOM
-  num_refs: 300            # Balanced reference views
+  num_refs: 180            # Balanced reference views
   nns_per_ref: 5           # Good neighbor count
   scaling_factor: 0.0004   # Balanced initial scale
   proj_err_tolerance: 0.005  # Reasonable tolerance
-  roma_model: "outdoors"   # For drone footage
+  roma_model: "indoors"   # For drone footage
   add_SfM_init: True       # Include SfM points

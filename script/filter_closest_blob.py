@@ -273,6 +273,44 @@ def save_filter_log(output_path, args, original_stats, filtered_stats, clusterin
     print(f"\nFilter log saved to: {log_file}")
 
 
+def write_ply(filename, points3D):
+    """Write filtered points to PLY file for visualization."""
+    if len(points3D) == 0:
+        print(f"Warning: No points to write to PLY file")
+        return
+        
+    # Collect point data
+    xyz = []
+    rgb = []
+    for point in points3D.values():
+        xyz.append(point.xyz)
+        rgb.append(point.color)
+    
+    xyz = np.array(xyz)
+    rgb = np.array(rgb, dtype=np.uint8)
+    
+    # Write PLY header
+    num_points = len(xyz)
+    with open(filename, 'w') as f:
+        f.write("ply\n")
+        f.write("format ascii 1.0\n")
+        f.write(f"element vertex {num_points}\n")
+        f.write("property float x\n")
+        f.write("property float y\n")
+        f.write("property float z\n")
+        f.write("property uchar red\n")
+        f.write("property uchar green\n")
+        f.write("property uchar blue\n")
+        f.write("end_header\n")
+        
+        # Write point data
+        for i in range(num_points):
+            f.write(f"{xyz[i, 0]:.6f} {xyz[i, 1]:.6f} {xyz[i, 2]:.6f} ")
+            f.write(f"{rgb[i, 0]} {rgb[i, 1]} {rgb[i, 2]}\n")
+    
+    print(f"Saved {num_points} points to: {filename}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Filter COLMAP scene to keep only closest point cloud blob to cameras')
@@ -387,6 +425,11 @@ def main():
     # Write filtered reconstruction
     print(f"\nWriting filtered reconstruction to {args.output_path}")
     reconstruction.write(args.output_path)
+    
+    # Write PLY file for visualization
+    ply_file = Path(args.output_path) / "sparse" / "0" / "points3D_filtered.ply"
+    ply_file.parent.mkdir(parents=True, exist_ok=True)
+    write_ply(ply_file, reconstruction.points3D)
     
     print(f"\nFiltered scene statistics:")
     print(f"  Points: {len(reconstruction.points3D):,} (removed {len(points_to_remove):,})")
