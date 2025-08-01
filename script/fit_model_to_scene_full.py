@@ -13,6 +13,7 @@ import logging
 import os
 import random
 import sys
+import shutil
 
 import hydra
 import numpy as np
@@ -40,6 +41,17 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
+
+def copy_config_to_output(config_name, model_path):
+    """Copy the config YAML file to the output directory for reference."""
+    config_file = os.path.join(project_root, "configs", f"{config_name}.yaml")
+    if os.path.exists(config_file):
+        dest_file = os.path.join(model_path, f"config_{config_name}.yaml")
+        shutil.copy2(config_file, dest_file)
+        print(f"Config copied to: {dest_file}")
+    else:
+        print(f"Warning: Config file not found: {config_file}")
 
 # --- Add argument parsing ---
 parser = argparse.ArgumentParser(
@@ -183,6 +195,9 @@ cfg.gs.dataset.model_path = model_path
 print(f"COLMAP scene: {scene_dir}")
 print(f"EDGS output: {model_path}")
 os.makedirs(model_path, exist_ok=True)
+
+# Copy config file to output directory for reference
+copy_config_to_output(args.config, model_path)
 
 
 # # 4. Initilize model and logger

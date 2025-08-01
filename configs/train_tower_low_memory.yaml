@@ -8,7 +8,7 @@ defaults:
 # EDGS core - no densification
 train:
   no_densify: True  # EDGS principle
-  gs_epochs: 60000  
+  gs_epochs: 30000  
   reduce_opacity: True
   max_lr: True
 
