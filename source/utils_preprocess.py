@@ -121,11 +121,12 @@ def extract_video_frames_to_disk(video_input, output_dir, k=1, max_size=1024, us
         scale_filter = f"scale='min({max_size},iw)':'min({max_size},ih)':force_original_aspect_ratio=decrease"
         fps_filter = f"fps={target_fps}"
         
+        # Calculate expected number of frames based on video duration and target fps
+        # This ensures we don't artificially limit frame extraction
         ffmpeg_cmd = [
             'ffmpeg', '-i', video_path, '-y',
             '-vf', f'{fps_filter},{scale_filter}',
             '-q:v', '2',  # High quality
-            '-frames:v', '1000',  # Limit to 1000 frames max
             os.path.join(output_dir, 'frame_%08d.jpg')
         ]
         
@@ -173,11 +174,11 @@ def extract_video_frames_fallback(video_path, output_dir, k=1, max_size=1024, ta
     else:
         max_frames_to_extract = min(total_frames, 5000)  # Limit to 5k frames max
         
-    # Additional limit for high resolution videos to avoid memory issues
+    # Additional settings for high resolution videos
     if width * height > 1920 * 1080:  # If higher than 1080p
-        max_frames_to_extract = min(max_frames_to_extract, 500)  # Much more conservative
+        # Don't limit frames, but reduce output size to manage memory
         max_size = min(max_size, 512)  # Reduce output size for 4K videos
-        print(f"High resolution video detected ({width}x{height}), limiting to {max_frames_to_extract} frames, output size {max_size}px")
+        print(f"High resolution video detected ({width}x{height}), output size set to {max_size}px")
     
     # Calculate frame interval based on target fps
     if video_fps > 0:
@@ -900,16 +901,13 @@ def process_input_for_colmap(input_path, num_ref_views, output_dir, max_size=102
                     
             except Exception as e:
                 print(f"Could not determine video duration ({e}), using frame-based sampling...")
-                # Fallback: sample more densely to ensure overlap
-                # Assume 30fps video, extract frames to approximate target_fps
+                # Fallback: sample to approximate target_fps
+                # Assume 30fps video if we don't know the actual fps
                 assumed_fps = 30.0
                 step = max(1, int(assumed_fps / target_fps))
                 
-                # But limit total frames to avoid memory issues
-                max_frames = 500  # Maximum frames to process
-                if len(frame_paths[::step]) > max_frames:
-                    step = max(1, total_frames // max_frames)
-                    
+                # For a 2-minute video at 3fps, we should get ~360 frames
+                # Don't artificially limit the frames
                 selected_frame_paths = frame_paths[::step]
                 print(f"Sampled {len(selected_frame_paths)} frames (every {step} frames from {total_frames} total, targeting ~{target_fps} fps)")
         else:
@@ -1074,17 +1072,22 @@ def orchestrate_video_to_colmap_scene(
 
     # Ensure base_work_dir exists
     os.makedirs(base_work_dir, exist_ok=True)
-    # Create scene directory without timestamp
-    scene_dir = os.path.join(base_work_dir, input_name_part)
     
-    # If directory already exists, add a counter instead of timestamp
-    counter = 1
-    original_scene_dir = scene_dir
-    while os.path.exists(scene_dir):
-        scene_dir = f"{original_scene_dir}_{counter}"
-        counter += 1
-
-    os.makedirs(scene_dir, exist_ok=True)
+    # Check if base_work_dir already ends with input_name_part to avoid duplication
+    if os.path.basename(base_work_dir) == input_name_part:
+        scene_dir = base_work_dir
+    else:
+        # Create scene directory without timestamp
+        scene_dir = os.path.join(base_work_dir, input_name_part)
+    
+    # If directory already exists and we're not reusing base_work_dir, add a counter
+    if scene_dir != base_work_dir:
+        counter = 1
+        original_scene_dir = scene_dir
+        while os.path.exists(scene_dir):
+            scene_dir = f"{original_scene_dir}_{counter}"
+            counter += 1
+        os.makedirs(scene_dir, exist_ok=True)
     print(f"Created scene directory for COLMAP: {scene_dir}")
 
     # Process video/images to extract and select optimal frames
