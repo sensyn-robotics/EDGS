@@ -230,6 +230,26 @@ else:
         )
     )
 omegaconf.OmegaConf.resolve(cfg)
+
+# Apply max_image_size to dataset resolution if specified
+if args.max_image_size > 0:
+    # Convert max_image_size to resolution setting for gaussian splatting
+    # The resolution parameter in GS is a scaling factor, not absolute pixels
+    # We need to estimate based on typical image sizes
+    if args.max_image_size <= 64:
+        cfg.gs.dataset.resolution = 8  # Very aggressive downscaling
+    elif args.max_image_size <= 128:
+        cfg.gs.dataset.resolution = 4  # Aggressive downscaling
+    elif args.max_image_size <= 256:
+        cfg.gs.dataset.resolution = 3  # Moderate downscaling
+    elif args.max_image_size <= 512:
+        cfg.gs.dataset.resolution = 2  # Light downscaling
+    elif args.max_image_size <= 1024:
+        cfg.gs.dataset.resolution = 1  # Minimal downscaling
+    else:
+        cfg.gs.dataset.resolution = -1  # Use original resolution
+    print(f"Setting resolution scale to {cfg.gs.dataset.resolution} based on max_image_size={args.max_image_size}")
+
 set_seed(cfg.seed)
 # Init output folder
 print("Output folder: {}".format(cfg.gs.dataset.model_path))

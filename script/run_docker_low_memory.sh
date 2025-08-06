@@ -21,8 +21,8 @@ fi
 
 echo "✅ Found container: $CONTAINER"
 
-# Conservative memory settings
-MEMORY_OPTS="PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256,expandable_segments:True CUDA_LAUNCH_BLOCKING=1"
+# Extreme memory settings
+MEMORY_OPTS="PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128,expandable_segments:False CUDA_LAUNCH_BLOCKING=1 PYTORCH_NO_CUDA_MEMORY_CACHING=1 TORCH_USE_CUDA_DSA=1"
 
 # Clear GPU memory aggressively
 echo -e "\n🧹 Clearing GPU memory..."
@@ -48,9 +48,10 @@ docker exec $CONTAINER bash -c "source /opt/conda/etc/profile.d/conda.sh && cond
 
 echo -e "\n🎯 Low Memory Configuration:"
 echo "  - Config: train_low_memory (SfM-only, no RoMa)"
-echo "  - Batch size: 8"
-echo "  - Image size: 1280"
-echo "  - Memory optimizations: CONSERVATIVE"
+echo "  - Batch size: 1"
+echo "  - Image size: 256 (aggressive reduction for RTX 4080)"
+echo "  - Memory caching: DISABLED"
+echo "  - Memory optimizations: AGGRESSIVE"
 echo ""
 
 # Run with low memory settings
@@ -59,10 +60,10 @@ docker exec $CONTAINER bash -c "
     source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && \
     cd /EDGS && \
     $MEMORY_OPTS python script/fit_model_to_scene_full.py \
-        --colmap_output_path outputs/tower_latter \
-        --output_path outputs/tower_latter \
+        --colmap_output_path outputs/tower_latter_working \
+        --output_path outputs/tower_latter_low_memory \
         --config train_low_memory \
-        --max_image_size 1280
+        --max_image_size 256
 "
 
 EXIT_CODE=$?

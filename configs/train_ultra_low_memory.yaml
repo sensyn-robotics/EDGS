@@ -15,9 +15,10 @@ train:
 
 # Extreme memory reduction settings
 gs:
+  sh_degree: 0  # Minimal SH (only DC) for maximum memory savings
   opt:
     # Absolute minimal batch size
-    batch_size: 4  # Extreme reduction for memory safety
+    batch_size: 1  # Ultimate reduction for RTX 4080 Laptop
     
     # Disable opacity reset completely
     opacity_reset_interval: 10_000_000  # Effectively disabled
@@ -34,12 +35,9 @@ gs:
     scaling_lr: 0.002     # Very reduced scaling
     rotation_lr: 0.0005   # Minimal rotation learning
 
-# Absolute minimal initialization
+# SfM-only initialization to avoid RoMa OOM  
 init_wC:
-  use: True  # Still use EDGS initialization
-  matches_per_ref: 5000   # Heavily reduced matches
-  num_refs: 60            # Minimal reference images
-  nns_per_ref: 1          # Single nearest neighbor only
-  scaling_factor: 0.0015  # Large initial scale to minimize gaussians
-  proj_err_tolerance: 0.015  # Very lenient tolerance
-  add_SfM_init: False     # Disable SfM completely
+  use: False  # Disable EDGS correlation initialization (avoids RoMa OOM)
+  add_SfM_init: True  # Use SfM points for meaningful reconstruction
+  matches_per_ref: 2000  # Very reduced matches to save memory
+  num_refs: 30  # Very reduced refs to save memory

@@ -9,15 +9,16 @@ defaults:
 # EDGS core - disable densification to save memory
 train:
   no_densify: True  # EDGS principle - no densification needed
-  gs_epochs: 25000  # Reduced iterations to save memory
+  gs_epochs: 15000  # Further reduced iterations to save memory
   reduce_opacity: True  # Help clean up bad gaussians
   max_lr: True  # Use max learning rate for better convergence
 
 # Memory-optimized Gaussian Splatting settings
 gs:
+  sh_degree: 0  # Minimal SH degree (only DC component) to save memory
   opt:
-    # Smaller batch size to avoid CUDA OOM
-    batch_size: 8  # Reduced from 16 to avoid memory spikes
+    # Minimal batch size to avoid CUDA OOM
+    batch_size: 1  # Extreme reduction for RTX 4080 Laptop constraints
     
     # Opacity reset for cleanup without too much memory overhead
     opacity_reset_interval: 10000  # Less frequent to save memory
@@ -38,3 +39,5 @@ gs:
 init_wC:
   use: False  # Disable EDGS correlation initialization (avoids RoMa OOM)
   add_SfM_init: True  # Use only SfM points
+  matches_per_ref: 10000  # Reduced from default 20000 to minimize points
+  num_refs: 180  # Reduced from 360 to minimize points
