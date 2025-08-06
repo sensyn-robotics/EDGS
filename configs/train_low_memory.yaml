@@ -34,11 +34,7 @@ gs:
     scaling_lr: 0.003     # Moderate scaling learning
     rotation_lr: 0.0015   # Balanced rotation learning
 
-# Reduced initialization to avoid memory issues
+# SfM-only initialization to avoid RoMa OOM
 init_wC:
-  matches_per_ref: 10000    # Reduced from 15000 to save memory
-  num_refs: 120            # Reduced from 180 to save memory
-  nns_per_ref: 3           # Reduced from 5 to save memory
-  scaling_factor: 0.0006   # Slightly larger to reduce gaussian count
-  proj_err_tolerance: 0.008  # More lenient to reduce points
-  add_SfM_init: False      # Disable SfM to save memory
+  use: False  # Disable EDGS correlation initialization (avoids RoMa OOM)
+  add_SfM_init: True  # Use only SfM points

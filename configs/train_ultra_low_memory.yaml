@@ -1,0 +1,45 @@
+defaults:
+  - train
+  - _self_
+
+# Ultra low memory configuration for EDGS
+# Emergency settings when system freezes with other configs
+# Absolute minimal settings while still using EDGS approach
+
+# EDGS core with absolute minimal memory
+train:
+  no_densify: True  # Essential EDGS principle
+  gs_epochs: 15000  # Further reduced iterations
+  reduce_opacity: True  # Enable opacity reduction
+  max_lr: True  # Use max learning rate for faster convergence
+
+# Extreme memory reduction settings
+gs:
+  opt:
+    # Absolute minimal batch size
+    batch_size: 4  # Extreme reduction for memory safety
+    
+    # Disable opacity reset completely
+    opacity_reset_interval: 10_000_000  # Effectively disabled
+    
+    # Very conservative learning rates for tiny batches
+    position_lr_init: 0.00008      # Very low for stability
+    position_lr_final: 0.0000008   # Proportionally lower
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 15000
+    
+    # Minimal learning rates for stability
+    feature_lr: 0.001     # Very conservative
+    opacity_lr: 0.01      # Minimal opacity learning
+    scaling_lr: 0.002     # Very reduced scaling
+    rotation_lr: 0.0005   # Minimal rotation learning
+
+# Absolute minimal initialization
+init_wC:
+  use: True  # Still use EDGS initialization
+  matches_per_ref: 5000   # Heavily reduced matches
+  num_refs: 60            # Minimal reference images
+  nns_per_ref: 1          # Single nearest neighbor only
+  scaling_factor: 0.0015  # Large initial scale to minimize gaussians
+  proj_err_tolerance: 0.015  # Very lenient tolerance
+  add_SfM_init: False     # Disable SfM completely

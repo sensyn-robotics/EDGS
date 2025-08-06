@@ -1,0 +1,43 @@
+defaults:
+  - train
+  - _self_
+
+# Optimal configuration for EDGS with balanced performance
+# Best for GPUs with 12GB+ memory
+
+# EDGS core settings
+train:
+  no_densify: True  # EDGS principle
+  gs_epochs: 30000  # Full training iterations
+  reduce_opacity: True
+  max_lr: True
+
+# Gaussian Splatting optimization
+gs:
+  opt:
+    # Optimal batch size for quality
+    batch_size: 12
+    
+    # Regular opacity reset for quality
+    opacity_reset_interval: 8000
+    
+    # Optimal learning rates
+    position_lr_init: 0.00032
+    position_lr_final: 0.0000032
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
+    
+    feature_lr: 0.0045
+    opacity_lr: 0.09
+    scaling_lr: 0.004
+    rotation_lr: 0.002
+
+# Full EDGS initialization
+init_wC:
+  use: True  # Use EDGS correlation initialization
+  matches_per_ref: 15000
+  num_refs: 180
+  nns_per_ref: 5
+  scaling_factor: 0.0005
+  proj_err_tolerance: 0.005
+  add_SfM_init: False
