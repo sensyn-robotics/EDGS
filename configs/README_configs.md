@@ -8,35 +8,40 @@ Training configs control EDGS model optimization, batch sizes, learning rates, a
 
 ### Available Training Configs
 
-1. **`train.yaml`** - Standard configuration
-   - Default balanced settings
-   - Suitable for most use cases
-   - GPU Memory: 8-12GB recommended
+| Config | GPU Memory | Batch Size | Initialization | Use Case |
+|--------|------------|------------|----------------|----------|
+| **`train.yaml`** | 8-12GB | 32 | EDGS (RoMa) | Default balanced settings |
+| **`train_high_quality.yaml`** | 16GB+ | 64 | EDGS + SfM | Best quality, long training (60k iters) |
+| **`train_optimal.yaml`** | 12GB+ | 12 | EDGS (RoMa) | Good quality/speed balance (30k iters) |
+| **`train_low_memory.yaml`** | 8-12GB | 8 | SfM-only* | Avoids RoMa OOM issues (25k iters) |
+| **`train_ultra_low_memory.yaml`** | <8GB | 4 | SfM-only* | Emergency fallback (15k iters) |
 
-2. **`train_high_quality.yaml`** - High quality mode
-   - Best reconstruction quality
-   - Larger batch sizes (64)
-   - More iterations (60k)
-   - Dense initialization (40k matches per ref, 500 refs)
-   - GPU Memory: 12GB+ required
+*SfM-only: Uses only COLMAP points instead of EDGS correlation initialization to avoid loading the RoMa model which can cause CUDA OOM.
 
-3. **`train_low_memory.yaml`** - Low memory mode
-   - Good quality with reduced memory usage
-   - Smaller batch size (16)
-   - Moderate iterations (30k)
-   - Balanced initialization (15k matches per ref, 180 refs)
-   - GPU Memory: 6-8GB
+### Key Differences:
+- **EDGS initialization (`init_wC.use: True`)**: Uses RoMa model for dense correspondence matching
+  - Better initialization quality
+  - Requires ~4GB additional GPU memory during initialization
+  - Can cause CUDA OOM on loading the model
+  
+- **SfM-only (`init_wC.use: False, add_SfM_init: True`)**: Uses only COLMAP sparse points
+  - Lower memory usage (no RoMa model)
+  - Slightly reduced initialization quality
+  - Reliable fallback for memory-constrained systems
 
-4. **`train_very_low_memory.yaml`** - Very low memory mode
-   - Minimal memory footprint
-   - Minimal batch size (8)
-   - Fewer iterations (20k)
-   - Reduced initialization (10k matches per ref, 90 refs)
-   - GPU Memory: 4-6GB
+### Docker Scripts
 
-### Usage
+For easy usage with proper memory management:
+
 ```bash
-python script/fit_model_to_scene_full.py --video_path <video> --config train_low_memory
+# Optimal performance (12GB+ GPU)
+./script/run_docker_optimal.sh  # uses train_optimal.yaml
+
+# Low memory mode (8-12GB GPU) 
+./script/run_docker_low_memory.sh  # uses train_low_memory.yaml
+
+# Ultra low memory (<8GB GPU)
+./script/run_docker_ultra_low_memory.sh  # uses train_ultra_low_memory.yaml
 ```
 
 ## COLMAP Configurations
@@ -45,34 +50,12 @@ COLMAP configs control 3D reconstruction quality vs memory trade-offs during the
 
 ### Available COLMAP Configs
 
-1. **`colmap_high_accuracy.yaml`** - Best quality
-   - 16,384 SIFT features per image
-   - 3200px max image size
-   - Super-resolution features (first_octave: -1)
-   - Memory: 16GB+ recommended
-
-2. **`colmap_balanced.yaml`** - Good quality
-   - 8,192 SIFT features per image
-   - 2048px max image size
-   - Standard feature extraction
-   - Memory: 8-12GB
-
-3. **`colmap_low_memory.yaml`** - Reduced memory (default)
-   - 4,096 SIFT features per image
-   - 1920px max image size
-   - No super-resolution features
-   - Memory: 6-8GB
-
-4. **`colmap_very_low_memory.yaml`** - Minimal memory
-   - 2,048 SIFT features per image
-   - 1024px max image size
-   - Minimal feature extraction
-   - Memory: 4-6GB
-
-### Usage
-```bash
-python script/fit_model_to_scene_full.py --video_path <video> --colmap_config very_low_memory
-```
+| Config | Max Image Size | SIFT Features | GPU Memory | Quality |
+|--------|----------------|---------------|------------|---------|
+| **`colmap_high_accuracy.yaml`** | 3200px | 16,384 | 16GB+ | Best |
+| **`colmap_balanced.yaml`** | 2048px | 8,192 | 8-12GB | Good |
+| **`colmap_low_memory.yaml`** | 1920px | 4,096 | 6-8GB | Fair |
+| **`colmap_very_low_memory.yaml`** | 1024px | 2,048 | 4-6GB | Basic |
 
 ## Common Use Cases
 
@@ -81,38 +64,73 @@ python script/fit_model_to_scene_full.py --video_path <video> --colmap_config ve
 python script/fit_model_to_scene_full.py \
     --video_path data/video.mp4 \
     --config train_high_quality \
-    --colmap_config high_accuracy
+    --colmap_config colmap_high_accuracy
 ```
 
-### Standard System (8-12GB GPU)
+### Standard System (12GB GPU)
 ```bash
 python script/fit_model_to_scene_full.py \
     --video_path data/video.mp4 \
-    --config train \
-    --colmap_config balanced
+    --config train_optimal \
+    --colmap_config colmap_balanced
 ```
 
-### Memory-Constrained System (6-8GB GPU)
+### Memory-Constrained System (8-12GB GPU)
 ```bash
 python script/fit_model_to_scene_full.py \
     --video_path data/video.mp4 \
     --config train_low_memory \
-    --colmap_config low_memory
+    --colmap_config colmap_low_memory
 ```
 
-### Minimal System (4-6GB GPU) or "Killed" Errors
+### Minimal System (<8GB GPU)
 ```bash
 python script/fit_model_to_scene_full.py \
     --video_path data/video.mp4 \
-    --config train_very_low_memory \
-    --colmap_config very_low_memory
+    --config train_ultra_low_memory \
+    --colmap_config colmap_very_low_memory \
+    --max_image_size 800  # Further reduce if needed
 ```
 
-## Key Differences Summary
+## Memory Troubleshooting
 
-| Config Level | Batch Size | SIFT Features | Image Size | GPU Memory |
-|-------------|------------|---------------|------------|------------|
-| High Quality | 64 | 16,384 | 3200px | 12-16GB+ |
-| Standard | 32 | 8,192 | 2048px | 8-12GB |
-| Low Memory | 16 | 4,096 | 1920px | 6-8GB |
-| Very Low Memory | 8 | 2,048 | 1024px | 4-6GB |
+### CUDA Out of Memory Errors
+
+1. **During initialization** (loading RoMa model):
+   - Switch to a config with SfM-only initialization (`train_low_memory.yaml` or `train_ultra_low_memory.yaml`)
+
+2. **During training**:
+   - Reduce batch size in the config
+   - Use a lower memory config
+   - Reduce `--max_image_size` parameter
+
+3. **During COLMAP**:
+   - Use a lower memory COLMAP config
+   - Reduce `--max_image_size` parameter
+
+### Docker-Specific Tips
+
+The Docker scripts in `script/run_docker_*.sh` include:
+- Automatic memory cleanup before/after training
+- PyTorch memory optimization settings
+- Proper conda environment activation
+- Helpful error messages for troubleshooting
+
+## Creating Custom Configs
+
+To create your own configuration:
+
+1. Copy an existing config as template
+2. Modify parameters as needed
+3. Use `defaults` section to inherit settings:
+   ```yaml
+   defaults:
+     - train  # inherits from train.yaml
+     - _self_
+   ```
+
+Key parameters to adjust for memory:
+- `gs.opt.batch_size`: Smaller = less memory
+- `init_wC.matches_per_ref`: Fewer = less memory
+- `init_wC.num_refs`: Fewer = less memory
+- `init_wC.use`: False = avoid RoMa model loading
