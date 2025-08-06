@@ -9,13 +9,13 @@ defaults:
 # EDGS core - disable densification to save memory
 train:
   no_densify: True  # EDGS principle - no densification needed
-  gs_epochs: 15000  # Further reduced iterations to save memory
+  gs_epochs: 18000  # Increased for better convergence
   reduce_opacity: True  # Help clean up bad gaussians
   max_lr: True  # Use max learning rate for better convergence
 
 # Memory-optimized Gaussian Splatting settings
 gs:
-  sh_degree: 0  # Minimal SH degree (only DC component) to save memory
+  sh_degree: 1  # Increased from 0 to 1 for better color representation
   opt:
     # Minimal batch size to avoid CUDA OOM
     batch_size: 1  # Extreme reduction for RTX 4080 Laptop constraints

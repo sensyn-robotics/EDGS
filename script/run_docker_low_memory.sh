@@ -60,10 +60,10 @@ docker exec $CONTAINER bash -c "
     source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && \
     cd /EDGS && \
     $MEMORY_OPTS python script/fit_model_to_scene_full.py \
-        --colmap_output_path outputs/tower_latter_working \
-        --output_path outputs/tower_latter_low_memory \
+        --colmap_output_path outputs/tower_latter \
+        --output_path outputs/tower_latter_improved \
         --config train_low_memory \
-        --max_image_size 256
+        --max_image_size 512
 "
 
 EXIT_CODE=$?
