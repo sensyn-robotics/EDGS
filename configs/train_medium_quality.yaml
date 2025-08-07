@@ -1,0 +1,55 @@
+defaults:
+  - train
+  - _self_
+
+# Medium quality configuration for EDGS
+# Optimized for better quality while maintaining memory efficiency
+# Between optimal and low_memory in the quality hierarchy
+
+# EDGS core - selective densification control
+train:
+  no_densify: False  # Allow limited densification for better quality
+  gs_epochs: 20000   # Increased iterations for better convergence
+  reduce_opacity: True
+  max_lr: True
+
+# Balanced Gaussian Splatting settings
+gs:
+  sh_degree: 1  # Increased from 0 to 1 for better lighting/color
+  opt:
+    batch_size: 1  # Keep minimal for memory safety
+    
+    # Densification control - very conservative
+    densify_from_iter: 2000      # Start later
+    densify_until_iter: 10000    # Stop earlier 
+    densify_grad_threshold: 0.001  # Higher threshold (less aggressive)
+    percent_dense: 0.005         # Reduced density percentage
+    densification_interval: 200  # Less frequent densification
+    
+    # Opacity management
+    opacity_reset_interval: 8000  # More frequent cleanup
+    
+    # Optimized learning rates for quality
+    position_lr_init: 0.00016      # Slightly reduced for stability
+    position_lr_final: 0.0000016   # 
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 20000
+    
+    # Enhanced learning rates for better quality
+    feature_lr: 0.0025      # Balanced feature learning
+    opacity_lr: 0.05        # Moderate opacity learning
+    scaling_lr: 0.002       # Conservative scaling
+    rotation_lr: 0.001      # Balanced rotation learning
+    
+    # Save more checkpoints for monitoring
+    save_iterations: [5000, 10000, 15000, 20000]
+
+# Enable EDGS correlation with reduced memory footprint
+init_wC:
+  use: True                    # Enable EDGS correlation (main advantage!)
+  add_SfM_init: True          # Keep SfM initialization
+  matches_per_ref: 6000       # Reduced from 10000 to save memory
+  num_refs: 120               # Reduced from 180 to save memory
+  nns_per_ref: 2              # Reduced from 3 to save memory
+  scaling_factor: 0.002       # Slightly increased for better matching
+  proj_err_tolerance: 0.02    # Slightly relaxed for more matches

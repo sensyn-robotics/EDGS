@@ -9,7 +9,7 @@ defaults:
 # EDGS core - disable densification to save memory
 train:
   no_densify: True  # EDGS principle - no densification needed
-  gs_epochs: 18000  # Increased for better convergence
+  gs_epochs: 60000  # Extended training for much better quality and less noise
   reduce_opacity: True  # Help clean up bad gaussians
   max_lr: True  # Use max learning rate for better convergence
 
@@ -21,19 +21,25 @@ gs:
     batch_size: 1  # Extreme reduction for RTX 4080 Laptop constraints
     
     # Opacity reset for cleanup without too much memory overhead
-    opacity_reset_interval: 10000  # Less frequent to save memory
+    opacity_reset_interval: 5000  # More frequent cleanup for better quality
     
-    # Optimized learning rates for EDGS convergence
-    position_lr_init: 0.00024      # Higher than default for better convergence
-    position_lr_final: 0.0000024   # Balanced final rate
+    # Optimized learning rates for EDGS convergence with longer training
+    position_lr_init: 0.00018      # Further reduced for stability in very long training
+    position_lr_final: 0.0000005   # Even lower final rate for fine details
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 25000
+    position_lr_max_steps: 55000  # Extended for 60k iterations
     
     # Other learning rates optimized for EDGS
     feature_lr: 0.0035    # Moderate increase for better features
     opacity_lr: 0.07      # Balanced opacity learning
     scaling_lr: 0.003     # Moderate scaling learning
     rotation_lr: 0.0015   # Balanced rotation learning
+    
+    # Save more checkpoints for monitoring long training
+    save_iterations: [15000, 30000, 40000, 50000, 60000]
+    
+    # Increase SSIM weight for better structural quality
+    lambda_dssim: 0.3  # Increased from default 0.2 for less noise
 
 # SfM-only initialization to avoid RoMa OOM
 init_wC:
