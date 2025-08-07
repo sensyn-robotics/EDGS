@@ -2,9 +2,9 @@ defaults:
   - train
   - _self_
 
-# High-quality configuration for EDGS
-# Optimized for best reconstruction quality on high-end systems (12GB+ GPU)
-# Combines the best settings from previous specialized configs
+# HIGHEST QUALITY configuration for EDGS ⭐⭐⭐⭐⭐
+# Optimized for absolute best reconstruction quality on high-end systems (16GB+ GPU)
+# Requires RTX 4090, RTX 3090, or A100 class hardware
 
 # EDGS with high-quality settings
 train:

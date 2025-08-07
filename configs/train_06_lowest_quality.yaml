@@ -2,9 +2,9 @@ defaults:
   - train
   - _self_
 
-# Ultra low memory configuration for EDGS
-# Emergency settings when system freezes with other configs
-# Absolute minimal settings while still using EDGS approach
+# LOWEST QUALITY configuration for EDGS ⭐
+# Absolute minimum settings for very limited GPU memory (4-8GB)
+# Basic reconstruction with minimal memory usage
 
 # EDGS core with absolute minimal memory
 train:

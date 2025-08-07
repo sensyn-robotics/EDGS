@@ -2,8 +2,9 @@ defaults:
   - train
   - _self_
 
-# Optimal configuration for EDGS with balanced performance
-# Best for GPUs with 12GB+ memory
+# OPTIMAL QUALITY configuration for EDGS ⭐⭐⭐
+# Balanced performance with good quality for 12-16GB GPUs
+# Best compromise between quality and training time
 
 # EDGS core settings
 train:

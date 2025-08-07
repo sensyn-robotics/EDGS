@@ -2,9 +2,9 @@ defaults:
   - train
   - _self_
 
-# Medium quality configuration for EDGS
-# Optimized for better quality while maintaining memory efficiency
-# Between optimal and low_memory in the quality hierarchy
+# MEDIUM QUALITY configuration for EDGS ⭐⭐⭐
+# Good quality with memory efficiency for 8-12GB GPUs
+# Memory-conscious settings with reasonable training time
 
 # EDGS core - selective densification control
 train:

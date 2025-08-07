@@ -6,9 +6,9 @@ This directory contains various training configurations for EDGS (Eliminating De
 
 The configurations are ranked from **highest to lowest quality/accuracy**:
 
-### 1. **train_high_quality.yaml** - Highest Quality ⭐⭐⭐⭐⭐
+### 1. **train_01_highest_quality.yaml** - Highest Quality ⭐⭐⭐⭐⭐
 - **Target GPU**: 16GB+ VRAM (RTX 4090, RTX 3090, A100, etc.)
-- **Quality**: Best possible reconstruction quality
+- **Quality**: Absolute best possible reconstruction quality
 - **Settings**:
   - 60,000 training epochs
   - Batch size: 64
@@ -17,11 +17,26 @@ The configurations are ranked from **highest to lowest quality/accuracy**:
   - High learning rates for optimal convergence
 - **Memory Usage**: High (~16GB+)
 - **Training Time**: ~3-4 hours
+- **Expected PSNR**: 25-35+
 - **Use when**: Maximum quality is needed and you have high-end hardware
 
-### 2. **train_optimal.yaml** - High Quality ⭐⭐⭐⭐
-- **Target GPU**: 12-16GB VRAM (RTX 4080 Ti, RTX 3080 Ti, etc.)
-- **Quality**: Excellent quality with balanced performance
+### 2. **train_02_high_quality.yaml** - High Quality ⭐⭐⭐⭐
+- **Target GPU**: 12-16GB VRAM (RTX 4080, RTX 3080 Ti, etc.)
+- **Quality**: Extended training with progressive densification
+- **Settings**:
+  - 100,000 training epochs (very long training)
+  - Batch size: 1
+  - SH degree: 1 (memory efficient)
+  - Progressive densification strategy
+  - No EDGS correlation (memory conservative)
+- **Memory Usage**: Medium-high (~12-16GB)
+- **Training Time**: ~3-4 hours
+- **Expected PSNR**: 18-25
+- **Use when**: You want excellent quality with 12-16GB GPU and can wait
+
+### 3. **train_03_optimal_quality.yaml** - Optimal Quality ⭐⭐⭐
+- **Target GPU**: 12-16GB VRAM (RTX 4080, RTX 3080 Ti, etc.)
+- **Quality**: Best compromise between quality and training time
 - **Settings**:
   - 30,000 training epochs
   - Batch size: 12
@@ -30,9 +45,10 @@ The configurations are ranked from **highest to lowest quality/accuracy**:
   - Optimized learning rates
 - **Memory Usage**: Medium-high (~12-16GB)
 - **Training Time**: ~1.5-2 hours
+- **Expected PSNR**: 22-28
 - **Use when**: You want high quality with reasonable training time
 
-### 3. **train_medium_quality.yaml** - Medium Quality ⭐⭐⭐
+### 4. **train_04_medium_quality.yaml** - Medium Quality ⭐⭐⭐
 - **Target GPU**: 8-12GB VRAM (RTX 4070, RTX 3070, RTX 4060 Ti, etc.)
 - **Quality**: Good quality with memory efficiency
 - **Settings**:
@@ -43,22 +59,24 @@ The configurations are ranked from **highest to lowest quality/accuracy**:
   - EDGS correlation with reduced parameters
 - **Memory Usage**: Medium (~8-12GB)
 - **Training Time**: ~1-1.5 hours
+- **Expected PSNR**: 16-20
 - **Use when**: You need good quality but have limited GPU memory
 
-### 4. **train_low_memory.yaml** - Lower Quality ⭐⭐
+### 5. **train_05_low_quality.yaml** - Low Quality ⭐⭐
 - **Target GPU**: 8-12GB VRAM (RTX 4060, RTX 3060 Ti, RTX 4050, etc.)
 - **Quality**: Acceptable quality with memory-safe settings
 - **Settings**:
-  - 60,000 training epochs (longer training compensates for simpler model)
+  - 80,000 training epochs (longer training compensates)
   - Batch size: 1
   - SH degree: 1 (reduced spherical harmonics)
-  - No densification (EDGS principle only)
+  - Controlled densification
   - SfM-only initialization (no EDGS correlation)
 - **Memory Usage**: Low (~8-12GB)
-- **Training Time**: ~2-2.5 hours
+- **Training Time**: ~2.5-3 hours
+- **Expected PSNR**: 15-18
 - **Use when**: You have memory constraints but can afford longer training time
 
-### 5. **train_ultra_low_memory.yaml** - Lowest Quality ⭐
+### 6. **train_06_lowest_quality.yaml** - Lowest Quality ⭐
 - **Target GPU**: 4-8GB VRAM (RTX 3050, GTX 1660, mobile GPUs, etc.)
 - **Quality**: Basic reconstruction quality
 - **Settings**:
@@ -70,6 +88,7 @@ The configurations are ranked from **highest to lowest quality/accuracy**:
   - Aggressive memory optimizations
 - **Memory Usage**: Very low (~4-8GB)
 - **Training Time**: ~30-60 minutes
+- **Expected PSNR**: 12-15
 - **Use when**: You have severe memory limitations or need quick results
 
 ## Usage Examples
@@ -77,39 +96,46 @@ The configurations are ranked from **highest to lowest quality/accuracy**:
 ### Running with Different Configurations
 
 ```bash
-# High quality (requires 16GB+ GPU)
+# Highest quality (requires 16GB+ GPU) - Best possible results
 python script/fit_model_to_scene_full.py \
     --colmap_output_path outputs/my_scene \
-    --output_path outputs/my_scene_high_quality \
-    --config train_high_quality \
+    --output_path outputs/my_scene_highest \
+    --config train_01_highest_quality \
     --max_image_size 1920
 
-# Optimal quality (requires 12-16GB GPU)  
+# High quality (requires 12-16GB GPU) - Extended training
+python script/fit_model_to_scene_full.py \
+    --colmap_output_path outputs/my_scene \
+    --output_path outputs/my_scene_high \
+    --config train_02_high_quality \
+    --max_image_size 800
+
+# Optimal quality (requires 12-16GB GPU) - Balanced approach
 python script/fit_model_to_scene_full.py \
     --colmap_output_path outputs/my_scene \
     --output_path outputs/my_scene_optimal \
-    --config train_optimal \
+    --config train_03_optimal_quality \
     --max_image_size 1600
 
-# Medium quality (8-12GB GPU)
+# Medium quality (8-12GB GPU) - Good compromise
 python script/fit_model_to_scene_full.py \
     --colmap_output_path outputs/my_scene \
     --output_path outputs/my_scene_medium \
-    --config train_medium_quality \
+    --config train_04_medium_quality \
     --max_image_size 1024
 
-# Low memory (8-12GB GPU, conservative)
+# Low quality (8-12GB GPU) - Memory safe, long training
 python script/fit_model_to_scene_full.py \
     --colmap_output_path outputs/my_scene \
-    --output_path outputs/my_scene_low_memory \
-    --config train_low_memory \
+    --output_path outputs/my_scene_low \
+    --config train_05_low_quality \
     --max_image_size 512
 
-# Ultra low memory (4-8GB GPU)
+# Lowest quality (4-8GB GPU) - Emergency settings
 python script/fit_model_to_scene_full.py \
     --colmap_output_path outputs/my_scene \
-    --output_path outputs/my_scene_ultra_low \
-    --config train_ultra_low_memory \
+    --output_path outputs/my_scene_lowest \
+    --config train_06_lowest_quality \
     --max_image_size 256
 ```
 

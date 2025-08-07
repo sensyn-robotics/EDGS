@@ -1,0 +1,58 @@
+defaults:
+  - train
+  - _self_
+
+# HIGH QUALITY configuration for EDGS ⭐⭐⭐⭐
+# Extended training with progressive densification for excellent quality
+# Optimized for 12-16GB GPUs (RTX 4080, RTX 3080 Ti, etc.)
+
+# EDGS core settings for progressive training
+train:
+  no_densify: False  # Allow densification in later stages
+  gs_epochs: 100000  # Much longer training for better convergence
+  reduce_opacity: True
+  max_lr: True
+
+# Progressive Gaussian Splatting settings
+gs:
+  sh_degree: 1  # Start with SH degree 1, can manually increase later
+  opt:
+    batch_size: 1
+    
+    # Progressive densification strategy
+    densify_from_iter: 20000     # Start densification later when model is stable
+    densify_until_iter: 70000    # Continue much longer
+    densify_grad_threshold: 0.0003  # More selective densification
+    percent_dense: 0.001         # Very conservative rate
+    densification_interval: 1000 # Less frequent
+    
+    # More frequent cleanup for quality
+    opacity_reset_interval: 3000
+    
+    # Progressive learning rate schedule
+    position_lr_init: 0.00032      # Higher initial rate
+    position_lr_final: 0.0000001   # Much lower final for fine details
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 90000   # Extended schedule
+    
+    # Other optimized rates
+    feature_lr: 0.0040
+    opacity_lr: 0.08
+    scaling_lr: 0.004
+    rotation_lr: 0.002
+    
+    # Progressive checkpoints
+    save_iterations: [20000, 40000, 60000, 80000, 100000]
+    
+    # Quality-focused loss
+    lambda_dssim: 0.3  # Higher structural weight
+
+# Conservative EDGS initialization to avoid OOM
+init_wC:
+  use: False  # Start without EDGS correlation to avoid OOM
+  add_SfM_init: True
+  matches_per_ref: 12000
+  num_refs: 150
+  nns_per_ref: 3
+  scaling_factor: 0.0008
+  proj_err_tolerance: 0.008
