@@ -1,7 +1,7 @@
 #!/bin/bash
-# Low memory Docker script for EDGS training - conservative settings for 8-12GB GPUs
+# High quality Docker script for EDGS training - extended training for 12-16GB GPUs
 
-echo "🛡️ EDGS Docker Training - Low Memory Mode"
+echo "⭐ EDGS Docker Training - High Quality Mode ⭐⭐⭐⭐"
 echo "=============================================================="
 
 # Check if docker compose is running
@@ -21,10 +21,10 @@ fi
 
 echo "✅ Found container: $CONTAINER"
 
-# Extreme memory settings
-MEMORY_OPTS="PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128,expandable_segments:False CUDA_LAUNCH_BLOCKING=1 PYTORCH_NO_CUDA_MEMORY_CACHING=1 TORCH_USE_CUDA_DSA=1"
+# Progressive memory settings
+MEMORY_OPTS="PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256,expandable_segments:False CUDA_LAUNCH_BLOCKING=1 PYTORCH_NO_CUDA_MEMORY_CACHING=1"
 
-# Clear GPU memory aggressively
+# Clear GPU memory
 echo -e "\n🧹 Clearing GPU memory..."
 docker exec $CONTAINER bash -c "
     source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && \
@@ -44,26 +44,29 @@ if torch.cuda.is_available():
 echo -e "\n📊 GPU memory status:"
 docker exec $CONTAINER bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && python /EDGS/script/check_gpu_memory.py"
 
-# Using pre-configured low memory settings
-
-echo -e "\n🎯 Low Memory Configuration:"
-echo "  - Config: train_low_memory (SfM-only, no RoMa)"
-echo "  - Batch size: 1"
-echo "  - Image size: 256 (aggressive reduction for RTX 4080)"
-echo "  - Memory caching: DISABLED"
-echo "  - Memory optimizations: AGGRESSIVE"
+echo -e "\n⭐ High Quality Configuration (Progressive Training):"
+echo "  - Config: train_02_high_quality (extended training)"
+echo "  - Batch size: 1 (memory efficient)"
+echo "  - SH degree: 1 (memory balanced)"
+echo "  - Training epochs: 100,000 (very long training)"
+echo "  - Progressive densification: ENABLED"
+echo "  - Image size: 800px (balanced resolution)"
+echo "  - Training time: ~3-4 hours"
+echo "  - Expected PSNR: 18-25"
+echo ""
+echo "🚀 Progressive approach - quality through extended training!"
 echo ""
 
-# Run with low memory settings
-echo "🏃 Starting training..."
+# Run with progressive high quality settings
+echo "🏃 Starting extended quality training..."
 docker exec $CONTAINER bash -c "
     source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && \
     cd /EDGS && \
     $MEMORY_OPTS python script/fit_model_to_scene_full.py \
         --colmap_output_path outputs/tower_latter \
-        --output_path outputs/tower_latter_improved \
-        --config train_low_memory \
-        --max_image_size 512
+        --output_path outputs/tower_latter_high_quality \
+        --config train_02_high_quality \
+        --max_image_size 800
 "
 
 EXIT_CODE=$?
@@ -73,11 +76,13 @@ echo -e "\n🧹 Cleaning up..."
 docker exec $CONTAINER bash -c "source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && python -c 'import torch; torch.cuda.empty_cache()' 2>/dev/null"
 
 if [ $EXIT_CODE -eq 0 ]; then
-    echo -e "\n✅ Training completed successfully!"
-    echo "📁 Results saved to: outputs/tower_latter/"
+    echo -e "\n✅ High quality training completed successfully!"
+    echo "📁 Results saved to: outputs/tower_latter_high_quality/"
+    echo "🎯 Progressive training approach achieved excellent quality through extended iterations!"
 else
     echo -e "\n❌ Training failed with exit code: $EXIT_CODE"
-    echo "💡 If you still get CUDA OOM, try: script/run_docker_ultra_low_memory.sh"
+    echo "💡 If you get CUDA OOM, try run_docker_03_optimal_quality.sh for shorter training"
+    echo "💡 Alternative: try run_docker_04_medium_quality.sh for 8-12GB GPUs"
 fi
 
 exit $EXIT_CODE

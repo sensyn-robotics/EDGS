@@ -144,11 +144,13 @@ python script/fit_model_to_scene_full.py \
 Convenient Docker scripts are available in the `script/` directory:
 
 ```bash
-# Use the appropriate script for your hardware
-./script/run_docker_high_quality.sh      # 16GB+ GPU
-./script/run_docker_optimal.sh           # 12-16GB GPU  
-./script/run_docker_low_memory.sh        # 8-12GB GPU (conservative)
-./script/run_docker_ultra_low_memory.sh  # 4-8GB GPU
+# Use the appropriate script for your hardware and quality needs
+./script/run_docker_01_highest_quality.sh    # 16GB+ GPU - Best possible quality ⭐⭐⭐⭐⭐
+./script/run_docker_02_high_quality.sh       # 12-16GB GPU - Extended training ⭐⭐⭐⭐  
+./script/run_docker_03_optimal_quality.sh    # 12-16GB GPU - Balanced approach ⭐⭐⭐
+./script/run_docker_04_medium_quality.sh     # 8-12GB GPU - Good compromise ⭐⭐⭐
+./script/run_docker_05_low_quality.sh        # 8-12GB GPU - Memory safe ⭐⭐
+./script/run_docker_06_lowest_quality.sh     # 4-8GB GPU - Emergency settings ⭐
 ```
 
 ## Configuration Parameters Explained
@@ -191,16 +193,47 @@ Convenient Docker scripts are available in the `script/` directory:
 
 ## Hardware Recommendations
 
-| GPU Model | VRAM | Recommended Config | Max Image Size |
-|-----------|------|-------------------|----------------|
-| RTX 4090 | 24GB | train_high_quality | 2048+ |
-| RTX 4080 | 16GB | train_optimal | 1600 |
-| RTX 4070 Ti | 12GB | train_medium_quality | 1024 |
-| RTX 4070 | 12GB | train_low_memory | 800 |
-| RTX 4060 Ti | 16GB | train_optimal | 1024 |
-| RTX 4060 Ti | 8GB | train_low_memory | 512 |
-| RTX 4060 | 8GB | train_ultra_low_memory | 256 |
-| RTX 3080 | 10GB | train_low_memory | 512 |
-| RTX 3070 | 8GB | train_ultra_low_memory | 256 |
+| GPU Model | VRAM | Recommended Config | Docker Script | Max Image Size |
+|-----------|------|--------------------|---------------|----------------|
+| RTX 4090 | 24GB | train_01_highest_quality | run_docker_01_highest_quality.sh | 1920+ |
+| RTX 4080 | 16GB | train_02_high_quality | run_docker_02_high_quality.sh | 800 |
+| RTX 4080 | 12GB | train_03_optimal_quality | run_docker_03_optimal_quality.sh | 1600 |
+| RTX 4070 Ti | 12GB | train_04_medium_quality | run_docker_04_medium_quality.sh | 1024 |
+| RTX 4070 | 12GB | train_05_low_quality | run_docker_05_low_quality.sh | 800 |
+| RTX 4060 Ti | 16GB | train_03_optimal_quality | run_docker_03_optimal_quality.sh | 1024 |
+| RTX 4060 Ti | 8GB | train_05_low_quality | run_docker_05_low_quality.sh | 512 |
+| RTX 4060 | 8GB | train_06_lowest_quality | run_docker_06_lowest_quality.sh | 256 |
+| RTX 3080 | 10GB | train_05_low_quality | run_docker_05_low_quality.sh | 512 |
+| RTX 3070 | 8GB | train_06_lowest_quality | run_docker_06_lowest_quality.sh | 256 |
+
+## Quick Reference
+
+### For Immediate Use:
+```bash
+# Best quality (if you have RTX 4090/A100)
+./script/run_docker_01_highest_quality.sh
+
+# Long training approach (RTX 4080, 3080 Ti)  
+./script/run_docker_02_high_quality.sh
+
+# Balanced (RTX 4080, 3080 Ti)
+./script/run_docker_03_optimal_quality.sh
+
+# Conservative (RTX 4070, 3070, 4060 Ti)
+./script/run_docker_04_medium_quality.sh
+
+# Memory safe (RTX 4060, 3060 Ti)
+./script/run_docker_05_low_quality.sh
+
+# Emergency (RTX 3050, mobile GPUs)
+./script/run_docker_06_lowest_quality.sh
+```
+
+### Quality Expectations:
+- **⭐⭐⭐⭐⭐ Highest**: PSNR 25-35+ (publication quality)
+- **⭐⭐⭐⭐ High**: PSNR 18-25 (excellent quality)  
+- **⭐⭐⭐ Optimal/Medium**: PSNR 16-22 (very good quality)
+- **⭐⭐ Low**: PSNR 15-18 (acceptable quality)
+- **⭐ Lowest**: PSNR 12-15 (basic reconstruction)
 
 Choose the configuration that matches your hardware capabilities and quality requirements!

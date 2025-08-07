@@ -1,7 +1,7 @@
 #!/bin/bash
 # Ultra low memory Docker script - absolute minimal settings to avoid system freeze
 
-echo "🆘 EDGS Docker Training - Ultra Low Memory Mode"
+echo "🆘 EDGS Docker Training - Lowest Quality Mode"
 echo "=============================================================="
 
 # Check if docker compose is running
@@ -71,7 +71,7 @@ docker exec $CONTAINER bash -c "
     $MEMORY_OPTS python script/fit_model_to_scene_full.py \
         --colmap_output_path outputs/tower_latter_minimal_final \
         --output_path outputs/tower_latter_ultra_low_memory \
-        --config train_ultra_low_memory \
+        --config train_06_lowest_quality \
         --max_image_size 64
 "
 
