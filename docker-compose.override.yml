@@ -1,0 +1,18 @@
+# Override file for devcontainer environment
+# This file is automatically used by docker compose when present
+# It overrides the volumes to use the HOST_PROJECT_PATH environment variable
+#
+# To use from devcontainer:
+# 1. Use the helper script: ./script/docker-compose-devcontainer.sh up -d
+# 2. Or manually: HOST_PROJECT_PATH=$(cat /proc/self/mountinfo | grep "/workspace " | awk '{print $4}') docker compose up -d
+#
+# Note: This file is ignored when running from the host machine directly
+services:
+  edgs-app:
+    volumes:
+      - ${HOST_PROJECT_PATH:-./}/data:/EDGS/data
+      - ${HOST_PROJECT_PATH:-./}/outputs:/EDGS/outputs
+      - ${HOST_PROJECT_PATH:-./}/script:/EDGS/script
+      - ${HOST_PROJECT_PATH:-./}/source:/EDGS/source
+      - ${HOST_PROJECT_PATH:-./}/configs:/EDGS/configs
+      - ${HOST_PROJECT_PATH:-./}/notebooks:/EDGS/notebooks

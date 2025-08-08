@@ -44,7 +44,7 @@ ENV DEVCONTAINER=true
 
 # Create workspace and config directories and set permissions
 RUN mkdir -p /workspace /home/node/.claude && \
-  chown -R node:node /workspace /home/node/.claude
+  chown -R node:node /workspace /home/node /home/node/.claude
 
 WORKDIR /workspace
 
@@ -85,10 +85,18 @@ RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}
 # Copy and set up firewall script
 COPY init-firewall.sh /usr/local/bin/
 USER root
+
+# Create docker group and add node user to it
+RUN groupadd -f docker && \
+  usermod -aG docker node
+
+# Set up sudo permissions for node user
 RUN chmod +x /usr/local/bin/init-firewall.sh && \
-  echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node-firewall && \
-  echo "node ALL=(root) NOPASSWD: /usr/sbin/usermod -aG docker node" >> /etc/sudoers.d/node-firewall && \
-  echo "node ALL=(root) NOPASSWD: /bin/chgrp docker /var/run/docker.sock" >> /etc/sudoers.d/node-firewall && \
-  echo "node ALL=(root) NOPASSWD: /bin/chmod 660 /var/run/docker.sock" >> /etc/sudoers.d/node-firewall && \
-  chmod 0440 /etc/sudoers.d/node-firewall
+  echo "node ALL=(root) NOPASSWD: /usr/local/bin/init-firewall.sh" > /etc/sudoers.d/node && \
+  echo "node ALL=(root) NOPASSWD: /usr/sbin/usermod" >> /etc/sudoers.d/node && \
+  echo "node ALL=(root) NOPASSWD: /bin/chown" >> /etc/sudoers.d/node && \
+  echo "node ALL=(root) NOPASSWD: /bin/chmod" >> /etc/sudoers.d/node && \
+  echo "node ALL=(root) NOPASSWD: /bin/chgrp" >> /etc/sudoers.d/node && \
+  chmod 0440 /etc/sudoers.d/node
+
 USER node

@@ -11,6 +11,8 @@ EDGS (Eliminating Densification for Gaussian Splatting) is a 3D reconstruction s
 The project runs in a Docker container with CUDA support and uses conda for Python environment management.
 
 ### Starting the Environment
+
+**From Host Machine:**
 ```bash
 # Start the Docker container
 docker compose up -d
@@ -18,6 +20,17 @@ docker compose up -d
 # Execute commands inside the container
 docker compose exec edgs-app bash
 ```
+
+**From DevContainer (VS Code Dev Containers):**
+```bash
+# Use the helper script that automatically handles volume mounting
+./script/docker-compose-devcontainer.sh up -d
+
+# Execute commands inside the container
+./script/docker-compose-devcontainer.sh exec edgs-app bash
+```
+
+Note: When running inside a devcontainer, the standard `docker compose` command will not properly mount the host directories due to path resolution issues. Always use the `docker-compose-devcontainer.sh` script which automatically detects the host paths and configures the volume mounts correctly.
 
 ### Python Environment
 Once inside the container, the conda environment `edgs` is activated automatically. All Python commands should be run with this environment active.
