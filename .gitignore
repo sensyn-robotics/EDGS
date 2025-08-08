@@ -7,7 +7,9 @@ wandb/
 served_files/
 
 # hidden folders 
-.*/**
+.venv/
+.git/
+
 
 # The rest is taken from https://github.com/Anttwo/SuGaR
 *.pt
