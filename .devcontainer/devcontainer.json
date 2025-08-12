@@ -51,5 +51,5 @@
   },
   "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=delegated",
   "workspaceFolder": "/workspace",
-  "postCreateCommand": "sudo /usr/local/bin/init-firewall.sh && echo 'alias docker=/workspace/script/docker-restricted.sh' >> ~/.bashrc && echo 'alias docker=/workspace/script/docker-restricted.sh' >> ~/.zshrc"
+  "postCreateCommand": "sudo /usr/local/bin/init-firewall.sh && echo 'alias docker=/workspace/.devcontainer/docker-safe-wrapper.sh' >> ~/.bashrc && echo 'alias docker=/workspace/.devcontainer/docker-safe-wrapper.sh' >> ~/.zshrc"
 }
