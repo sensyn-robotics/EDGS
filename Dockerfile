@@ -7,12 +7,17 @@ WORKDIR /EDGS
 RUN apt-get update && apt-get install -y \
   git \
   wget \
+  curl \
   build-essential \
   cmake \
   ninja-build \
   libgl1-mesa-glx \
   libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
+
+# Install Node.js (required for Claude Code)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+  apt-get install -y nodejs
 
 # Copy only essential files for cloning submodules first (e.g., .gitmodules)
 # Or, if submodules are public, you might not need to copy anything specific for this step
@@ -52,6 +57,9 @@ RUN /bin/bash -c "source activate edgs && \
   pip install pycolmap wandb hydra-core tqdm torchmetrics lpips matplotlib rich plyfile imageio imageio-ffmpeg && \
   pip install -e ./submodules/RoMa && \
   pip install gradio plotly scikit-learn moviepy==2.1.1 ffmpeg open3d jupyterlab matplotlib"
+
+# Install Claude Code CLI
+RUN npm install -g @anthropic-ai/claude-code
 
 # Expose the port for Gradio
 EXPOSE 7862
