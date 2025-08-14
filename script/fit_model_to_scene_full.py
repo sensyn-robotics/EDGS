@@ -14,6 +14,7 @@ import os
 import random
 import sys
 import shutil
+import cv2
 
 import hydra
 import numpy as np
@@ -34,7 +35,9 @@ from source.trainer import EDGSTrainer
 from source.utils_aux import set_seed
 from source.utils_preprocess import (
     orchestrate_video_to_colmap_scene,  # Use the refactored function
+    run_colmap_on_scene,  # Direct COLMAP runner
 )
+from script.extract_frames_uniform import extract_frames_uniformly
 
 # Initialize logging
 logging.basicConfig(
@@ -52,6 +55,61 @@ def copy_config_to_output(config_name, model_path):
         print(f"Config copied to: {dest_file}")
     else:
         print(f"Warning: Config file not found: {config_file}")
+
+
+def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_image_size=1024, colmap_config="very_low_memory"):
+    """
+    Process video with uniform frame extraction across entire duration and run COLMAP.
+    
+    Args:
+        video_path: Path to input video
+        output_path: Directory to save COLMAP scene
+        target_fps: Effective target fps for frame extraction
+        max_image_size: Maximum dimension for frames
+        colmap_config: COLMAP configuration preset
+        
+    Returns:
+        scene_dir: Path to COLMAP scene directory
+    """
+    print(f"🎥 Processing video: {video_path}")
+    print(f"📁 Output directory: {output_path}")
+    
+    # Create output directory
+    os.makedirs(output_path, exist_ok=True)
+    images_dir = os.path.join(output_path, "images")
+    
+    # Calculate number of frames based on video duration and target fps
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError(f"Cannot open video: {video_path}")
+    
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    duration = total_frames / fps if fps > 0 else 0
+    cap.release()
+    
+    # Calculate target number of frames (duration * target_fps)
+    target_num_frames = min(1000, max(100, int(duration * target_fps)))  # Between 100-1000 frames
+    print(f"📊 Video duration: {duration:.1f}s ({duration/60:.1f} min)")
+    print(f"🎯 Target frames: {target_num_frames} (at {target_fps} fps)")
+    
+    # Extract frames uniformly across entire video
+    print("🔄 Extracting frames uniformly across entire video...")
+    frame_paths = extract_frames_uniformly(
+        video_path=video_path,
+        output_dir=images_dir, 
+        num_frames=target_num_frames,
+        max_size=max_image_size if max_image_size > 0 else 2048
+    )
+    
+    print(f"✅ Extracted {len(frame_paths)} frames")
+    
+    # Run COLMAP reconstruction
+    print("🏗️  Running COLMAP reconstruction...")
+    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_config)
+    
+    print(f"🎉 COLMAP processing complete!")
+    return output_path
 
 # --- Add argument parsing ---
 parser = argparse.ArgumentParser(
@@ -166,19 +224,13 @@ if not use_existing_colmap:
         
     print(f"Starting video processing for: {args.video_path}")
     try:
-        # The first return value 'images_data' might not be directly used by the trainer
-        # if the Scene object loads everything from the COLMAP directory.
-        # Use original image size if max_image_size is -1
-        max_size = args.max_image_size if args.max_image_size > 0 else 999999
-        
-        _, scene_dir = orchestrate_video_to_colmap_scene(
-            args.video_path,
-            cfg.init_wC.num_refs,  # Assuming you added this arg
-            max_size=max_size,  # Use configurable size
-            base_work_dir=args.colmap_output_path,  # Assuming you added this arg
-            use_automatic_mode=True,  # Use automatic reconstructor-like settings
-            target_fps=args.target_fps,  # Pass target FPS for frame extraction
-            colmap_config=args.colmap_config,  # Pass COLMAP configuration
+        # Use new uniform frame extraction that samples across entire video duration
+        scene_dir = process_video_to_colmap_scene(
+            video_path=args.video_path,
+            output_path=args.output_path,  # Use specified output path directly
+            target_fps=args.target_fps,
+            max_image_size=args.max_image_size,
+            colmap_config=args.colmap_config
         )
         if scene_dir is None:
             print(f"Failed to process video {args.video_path}. Exiting.")

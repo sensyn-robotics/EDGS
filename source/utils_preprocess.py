@@ -251,7 +251,8 @@ def extract_video_frames_fallback(video_path, output_dir, k=1, max_size=1024, ta
     # Handle videos with incorrect frame count or very high resolution
     if total_frames > 1000000:  # If more than 1M frames, likely incorrect
         print(f"Warning: Video reports {total_frames} frames, which seems incorrect. Limiting extraction.")
-        max_frames_to_extract = 1000  # Extract max 1k frames for high-res videos
+        # Try to extract frames until we can't read anymore
+        max_frames_to_extract = 100000  # Try up to 100k frame reads
     else:
         max_frames_to_extract = min(total_frames, 5000)  # Limit to 5k frames max
         
@@ -260,7 +261,18 @@ def extract_video_frames_fallback(video_path, output_dir, k=1, max_size=1024, ta
         print(f"High resolution video detected ({width}x{height})")
     
     # Calculate frame interval based on target fps
-    if video_fps > 0:
+    # Handle incorrect FPS detection (common with some video codecs)
+    if video_fps > 1000:  # Clearly incorrect FPS
+        print(f"Warning: Detected FPS ({video_fps}) seems incorrect. Using frame count to estimate.")
+        # Estimate actual FPS assuming ~30-60 fps is typical
+        estimated_duration = total_frames / 30.0  # Assume 30fps as baseline
+        frame_interval = max(1, int(total_frames / (estimated_duration * target_fps)))
+        if frame_interval > 100:  # Still too high, use a reasonable default
+            frame_interval = max(1, int(30 / target_fps))  # Assume 30fps
+            print(f"Using default frame interval: every {frame_interval} frames")
+        else:
+            print(f"Estimated frame interval: every {frame_interval} frames")
+    elif video_fps > 0:
         frame_interval = max(1, int(video_fps / target_fps))
         print(f"Video FPS: {video_fps:.1f}, Target FPS: {target_fps}, Frame interval: every {frame_interval} frames")
     else:
