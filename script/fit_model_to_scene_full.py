@@ -15,6 +15,7 @@ import random
 import sys
 import shutil
 import cv2
+from pathlib import Path
 
 import hydra
 import numpy as np
@@ -46,6 +47,27 @@ logging.basicConfig(
 )
 
 
+def find_videos_in_directory(directory_path, extensions=('.mp4', '.MP4', '.mov', '.MOV', '.avi', '.AVI')):
+    """
+    Recursively find all video files in a directory and its subdirectories.
+    
+    Args:
+        directory_path: Root directory to search
+        extensions: Tuple of valid video file extensions
+        
+    Returns:
+        List of video paths
+    """
+    videos = []
+    directory_path = Path(directory_path)
+    
+    for ext in extensions:
+        for video_path in directory_path.rglob(f'*{ext}'):
+            videos.append(str(video_path))
+    
+    return sorted(videos)
+
+
 def copy_config_to_output(config_name, model_path):
     """Copy the config YAML file to the output directory for reference."""
     config_file = os.path.join(project_root, "configs", f"{config_name}.yaml")
@@ -59,10 +81,11 @@ def copy_config_to_output(config_name, model_path):
 
 def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_image_size=1024, colmap_config="very_low_memory"):
     """
-    Process video with uniform frame extraction across entire duration and run COLMAP.
+    Process video(s) with uniform frame extraction across entire duration and run COLMAP.
+    Can handle both single video file or directory containing multiple videos.
     
     Args:
-        video_path: Path to input video
+        video_path: Path to input video file or directory containing videos
         output_path: Directory to save COLMAP scene
         target_fps: Effective target fps for frame extraction
         max_image_size: Maximum dimension for frames
@@ -71,38 +94,92 @@ def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_i
     Returns:
         scene_dir: Path to COLMAP scene directory
     """
-    print(f"🎥 Processing video: {video_path}")
+    # Check if input is a directory or single video file
+    is_directory = os.path.isdir(video_path)
+    
+    if is_directory:
+        print(f"🎥 Processing multiple videos from directory: {video_path}")
+        videos = find_videos_in_directory(video_path)
+        if not videos:
+            raise ValueError(f"No video files found in {video_path}")
+        print(f"📊 Found {len(videos)} video(s):")
+        for v in videos:
+            print(f"  - {v}")
+    else:
+        print(f"🎥 Processing single video: {video_path}")
+        videos = [video_path]
+    
     print(f"📁 Output directory: {output_path}")
     
     # Create output directory
     os.makedirs(output_path, exist_ok=True)
     images_dir = os.path.join(output_path, "images")
+    os.makedirs(images_dir, exist_ok=True)
     
-    # Calculate number of frames based on video duration and target fps
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        raise ValueError(f"Cannot open video: {video_path}")
+    # Process each video
+    all_frame_paths = []
+    frame_counter = 0
     
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    duration = total_frames / fps if fps > 0 else 0
-    cap.release()
+    # Calculate frames per video
+    if is_directory and len(videos) > 1:
+        # For multiple videos, distribute frames
+        total_target_frames = 500  # Total frames target for multiple videos
+        frames_per_video = max(50, total_target_frames // len(videos))
+    else:
+        frames_per_video = None  # Will be calculated per video
     
-    # Calculate target number of frames (duration * target_fps)
-    target_num_frames = min(1000, max(100, int(duration * target_fps)))  # Between 100-1000 frames
-    print(f"📊 Video duration: {duration:.1f}s ({duration/60:.1f} min)")
-    print(f"🎯 Target frames: {target_num_frames} (at {target_fps} fps)")
+    for idx, video_file in enumerate(videos):
+        print(f"\n🔄 Processing video {idx+1}/{len(videos)}: {os.path.basename(video_file)}")
+        
+        # Get video info
+        cap = cv2.VideoCapture(video_file)
+        if not cap.isOpened():
+            print(f"⚠️  Warning: Cannot open video: {video_file}, skipping...")
+            continue
+        
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        duration = total_frames / fps if fps > 0 else 0
+        cap.release()
+        
+        print(f"  Duration: {duration:.1f}s, FPS: {fps:.1f}, Total frames: {total_frames}")
+        
+        # Calculate target number of frames
+        if frames_per_video:
+            # Multiple videos: use calculated frames per video
+            target_num_frames = min(frames_per_video, max(30, int(duration * target_fps)))
+        else:
+            # Single video: use standard calculation
+            target_num_frames = min(1000, max(100, int(duration * target_fps)))
+        
+        print(f"  🎯 Target frames: {target_num_frames}")
+        
+        # Extract frames to a temporary directory first
+        temp_dir = os.path.join(output_path, f"temp_video_{idx}")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        print("  🔄 Extracting frames uniformly...")
+        frame_paths = extract_frames_uniformly(
+            video_path=video_file,
+            output_dir=temp_dir,
+            num_frames=target_num_frames,
+            max_size=max_image_size if max_image_size > 0 else 2048
+        )
+        
+        # Move and rename frames to combined directory with global numbering
+        for frame_path in frame_paths:
+            new_filename = f"{frame_counter:08d}.jpg"
+            new_path = os.path.join(images_dir, new_filename)
+            shutil.move(frame_path, new_path)
+            all_frame_paths.append(new_path)
+            frame_counter += 1
+        
+        # Clean up temp directory
+        shutil.rmtree(temp_dir)
+        
+        print(f"  ✅ Extracted {len(frame_paths)} frames")
     
-    # Extract frames uniformly across entire video
-    print("🔄 Extracting frames uniformly across entire video...")
-    frame_paths = extract_frames_uniformly(
-        video_path=video_path,
-        output_dir=images_dir, 
-        num_frames=target_num_frames,
-        max_size=max_image_size if max_image_size > 0 else 2048
-    )
-    
-    print(f"✅ Extracted {len(frame_paths)} frames")
+    print(f"\n✅ Total frames extracted: {len(all_frame_paths)}")
     
     # Run COLMAP reconstruction
     print("🏗️  Running COLMAP reconstruction...")
@@ -113,7 +190,7 @@ def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_i
 
 # --- Add argument parsing ---
 parser = argparse.ArgumentParser(
-    description="Fit EDGS model to a scene, optionally from a video."
+    description="Fit EDGS model to a scene from a video file or directory containing multiple videos."
 )
 parser.add_argument(
     "--video_path",
@@ -121,7 +198,7 @@ parser.add_argument(
     default=os.path.join(
         project_root, "assets", "examples", "video_fruits.mp4"
     ),  # Use project_root
-    help="Path to the input video file.",
+    help="Path to the input video file or directory containing video files.",
 )
 parser.add_argument(
     "--colmap_output_path",
@@ -215,7 +292,17 @@ if args.colmap_output_path and os.path.exists(args.colmap_output_path):
 if not use_existing_colmap:
     # Process video to create COLMAP scene
     if not os.path.exists(args.video_path):
-        print(f"Error: Video file does not exist: {args.video_path}")
+        print(f"Error: Video path does not exist: {args.video_path}")
+        sys.exit(1)
+    
+    # Check if it's a directory or file
+    if os.path.isdir(args.video_path):
+        videos = find_videos_in_directory(args.video_path)
+        if not videos:
+            print(f"Error: No video files found in directory: {args.video_path}")
+            sys.exit(1)
+    elif not os.path.isfile(args.video_path):
+        print(f"Error: Path is neither a file nor directory: {args.video_path}")
         sys.exit(1)
     
     # Set default colmap_output_path if not specified
