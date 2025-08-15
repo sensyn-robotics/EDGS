@@ -61,6 +61,17 @@ RUN /bin/bash -c "source activate edgs && \
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# Create a non-root user
+RUN useradd -m -s /bin/bash claude_user && \
+    chown -R claude_user:claude_user /EDGS && \
+    chown -R claude_user:claude_user /opt/conda
+
+# Switch to non-root user
+USER claude_user
+
+# Set up conda for the new user
+RUN echo "source activate edgs" >> ~/.bashrc
+
 # Expose the port for Gradio
 EXPOSE 7862
 
