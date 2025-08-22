@@ -102,8 +102,6 @@ docker compose exec edgs-app bash
 python script/fit_model_to_scene_full.py --video_path <your mp4 video> [--output_path <EDGS output directory>]
 ```
 
-> **🔧 Enhanced Video Processing**: The video processing pipeline now includes improved frame extraction with ffmpeg support, automatic handling of problematic video formats, and optimized COLMAP settings to ensure single unified reconstructions instead of fragmented models.
-
 **Additinal features:**
 
 1. **Use existing COLMAP reconstruction** - If the path exists, it will be used directly:
@@ -122,23 +120,17 @@ python script/fit_model_to_scene_full.py \
 3. **Memory-efficient configurations** - Choose based on your GPU memory:
 ```bash
 # High quality mode (best quality, requires 12GB+ GPU)
-python script/fit_model_to_scene_full.py --video_path <video> --config train_high_quality
+python script/fit_model_to_scene_full.py --video_path <video> --config train_02_high_quality
 
 # Low memory mode (good quality, for 6-8GB GPUs)
-python script/fit_model_to_scene_full.py --video_path <video> --config train_low_memory
+python script/fit_model_to_scene_full.py --video_path <video> --config train_05_low_quality
 
 # Very low memory mode (minimal memory, for 4-6GB GPUs)  
-python script/fit_model_to_scene_full.py --video_path <video> --config train_very_low_memory
+python script/fit_model_to_scene_full.py --video_path <video> --config train_06_lowest_quarity
 ```
 
 4. **Frame extraction control** - Control video sampling rate for reconstruction quality:
 ```bash
-# Extract frames at 3 fps (default, good balance)
-python script/fit_model_to_scene_full.py --video_path <video> --target_fps 3.0
-
-# Higher density extraction for complex scenes (4-5 fps)
-python script/fit_model_to_scene_full.py --video_path <video> --target_fps 5.0
-
 # Lower density for long videos or memory constraints (1-2 fps)
 python script/fit_model_to_scene_full.py --video_path <video> --target_fps 1.5
 ```
@@ -150,9 +142,6 @@ python script/fit_model_to_scene_full.py --video_path <video> --max_image_size -
 
 # Resize to 1920px max dimension (4K→1080p, preserves aspect ratio)
 python script/fit_model_to_scene_full.py --video_path <video> --max_image_size 1920
-
-# Resize to 1024px max dimension (faster processing, lower quality)
-python script/fit_model_to_scene_full.py --video_path <video> --max_image_size 1024
 ```
 
 > **📐 max_image_size Parameter**: This refers to the maximum dimension (width OR height). Images larger than this value are resized while preserving aspect ratio. For example, a 4K image (3840x2160) with `--max_image_size 1920` becomes 1920x1080. Use `-1` to keep the original resolution.
@@ -184,39 +173,6 @@ python script/fit_model_to_scene_full.py \
     --target_fps 3.0 \
     --max_image_size -1 \
     --output_path outputs/my_video_edgs
-
-# High-quality processing for complex scenes at original resolution
-python script/fit_model_to_scene_full.py \
-    --video_path data/complex_scene.mp4 \
-    --config train_high_quality \
-    --colmap_config high_accuracy \
-    --target_fps 5.0 \
-    --max_image_size -1 \
-    --output_path outputs/complex_scene_edgs
-
-# Fast processing with reduced resolution for testing
-python script/fit_model_to_scene_full.py \
-    --video_path data/test_scene.mp4 \
-    --config train_low_memory \
-    --colmap_config very_low_memory \
-    --target_fps 2.0 \
-    --max_image_size 1024 \
-    --output_path outputs/test_scene_fast
-
-# Process 4K videos with conservative settings (resize to 1080p)
-python script/fit_model_to_scene_full.py \
-    --video_path data/4k_drone_video.MP4 \
-    --config train_very_low_memory \
-    --colmap_config very_low_memory \
-    --target_fps 2.0 \
-    --max_image_size 1920 \
-    --output_path outputs/drone_4k
-
-# Use existing COLMAP scene with custom output location
-python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_colmap_scene \
-    --config train_low_memory \
-    --output_path outputs/my_edgs_results
 ```
 
 #### Option C
