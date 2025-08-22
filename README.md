@@ -62,20 +62,19 @@ Without `--no_share` flag you will get the adress for gradio app that you can sh
 
 Alternatively, check our [Colab notebook](https://colab.research.google.com/github/CompVis/EDGS/blob/main/notebooks/fit_model_to_scene_full.ipynb).
 
-### 
 
 
 
 <a id="sec-install"></a>
 ## 🛠️ Installation
 
-You can install it just:
-
 ```bash
+# Using Docker (recommended)
 docker compose up -d
-```
 
-or you can install with running `script/install.sh`.
+# Or manual installation
+bash script/install.sh
+```
 
 <a id="sec-data"></a>
 ## 📦 Data
@@ -96,83 +95,38 @@ python script/gradio_demo.py --port 7862
 ```
 
 #### Option B
-From command line.
-```
-docker compose exec edgs-app bash
-python script/fit_model_to_scene_full.py --video_path <your mp4 video> [--output_path <EDGS output directory>]
-```
-
-**Additinal features:**
-
-1. **Use existing COLMAP reconstruction** - If the path exists, it will be used directly:
+From command line - Complete command with all possible arguments:
 ```bash
-python script/fit_model_to_scene_full.py --colmap_output_path <path_to_existing_colmap_scene>
+docker compose exec edgs-app python script/fit_model_to_scene_full.py \
+    --video_path <input.mp4>              # Path to video file or directory with videos \
+    --output_path <output_dir>            # Where to save EDGS model (optional) \
+    --colmap_output_path <colmap_dir>     # COLMAP scene path (optional, reuses if exists) \
+    --config <config_name>                # Training config (see options below) \
+    --colmap_config <colmap_preset>       # COLMAP preset: high_accuracy/balanced/low_memory/very_low_memory \
+    --target_fps <fps>                    # Frame extraction rate (default: 3.0) \
+    --max_image_size <pixels>             # Max image dimension, -1 for original (default: -1)
 ```
 
-2. **Specify custom output paths** - Control where COLMAP and EDGS outputs are saved:
+**Available training configs by GPU memory:**
+- `train_01_highest_quality` (16GB+)
+- `train_02_high_quality` (12GB+) 
+- `train_03_optimal_quality` (10GB+)
+- `train_04_medium_quality` (8GB+)
+- `train_05_low_quality` (6GB+)
+- `train_06_lowest_quality` (4GB+)
+
+**Quick examples:**
 ```bash
-python script/fit_model_to_scene_full.py \
-    --video_path <video> \
-    --colmap_output_path <colmap_output> \
-    --output_path <edgs_output_path>
-```
+# Simple usage
+python script/fit_model_to_scene_full.py --video_path video.mp4
 
-3. **Memory-efficient configurations** - Choose based on your GPU memory:
-```bash
-# High quality mode (best quality, requires 12GB+ GPU)
-python script/fit_model_to_scene_full.py --video_path <video> --config train_02_high_quality
+# Low memory system
+python script/fit_model_to_scene_full.py --video_path video.mp4 \
+    --config train_06_lowest_quality --colmap_config very_low_memory
 
-# Low memory mode (good quality, for 6-8GB GPUs)
-python script/fit_model_to_scene_full.py --video_path <video> --config train_05_low_quality
-
-# Very low memory mode (minimal memory, for 4-6GB GPUs)  
-python script/fit_model_to_scene_full.py --video_path <video> --config train_06_lowest_quarity
-```
-
-4. **Frame extraction control** - Control video sampling rate for reconstruction quality:
-```bash
-# Lower density for long videos or memory constraints (1-2 fps)
-python script/fit_model_to_scene_full.py --video_path <video> --target_fps 1.5
-```
-
-5. **Image resolution control** - Control output image dimensions:
-```bash
-# Keep original resolution (default, recommended for high-quality reconstruction)
-python script/fit_model_to_scene_full.py --video_path <video> --max_image_size -1
-
-# Resize to 1920px max dimension (4K→1080p, preserves aspect ratio)
-python script/fit_model_to_scene_full.py --video_path <video> --max_image_size 1920
-```
-
-> **📐 max_image_size Parameter**: This refers to the maximum dimension (width OR height). Images larger than this value are resized while preserving aspect ratio. For example, a 4K image (3840x2160) with `--max_image_size 1920` becomes 1920x1080. Use `-1` to keep the original resolution.
-
-6. **COLMAP memory/quality profiles** - Control COLMAP reconstruction settings:
-```bash
-# High accuracy (best quality, requires 16GB+ memory)
-python script/fit_model_to_scene_full.py --video_path <video> --colmap_config high_accuracy
-
-# Balanced quality and memory usage (recommended for 8-12GB memory)
-python script/fit_model_to_scene_full.py --video_path <video> --colmap_config balanced
-
-# Low memory usage (good for 6-8GB memory, default)
-python script/fit_model_to_scene_full.py --video_path <video> --colmap_config low_memory
-
-# Very low memory usage (minimal memory, 4-6GB memory)
-python script/fit_model_to_scene_full.py --video_path <video> --colmap_config very_low_memory
-```
-
-> **⚙️ COLMAP Configuration Profiles**: These profiles control the trade-off between reconstruction quality and memory usage by adjusting SIFT feature extraction, matching, and mapping parameters. Use `very_low_memory` if you encounter "Killed" errors during COLMAP processing.
-
-**Examples:**
-```bash
-# Process new video with low memory settings and custom frame rate
-python script/fit_model_to_scene_full.py \
-    --video_path data/my_video.mov \
-    --config train_low_memory \
-    --colmap_config low_memory \
-    --target_fps 3.0 \
-    --max_image_size -1 \
-    --output_path outputs/my_video_edgs
+# High quality with custom settings
+python script/fit_model_to_scene_full.py --video_path video.mp4 \
+    --config train_02_high_quality --target_fps 5.0 --max_image_size 1920
 ```
 
 #### Option C
@@ -215,22 +169,6 @@ Nerf synthetic format is also acceptable.
 
 You can also use functions provided in our code to convert a collection of images or a sinlge video into a desired format. However, this may requre tweaking and processing time can be large for large collection of images with little overlap.
 
-## 🎬 Video Processing Improvements
-
-Recent enhancements to the video processing pipeline provide better handling of various video formats and improved reconstruction quality:
-
-### **Key Features:**
-- **Robust Frame Extraction**: Uses ffmpeg with OpenCV fallback for reliable processing of problematic video formats
-- **Single Reconstruction Guarantee**: Optimized COLMAP settings prevent fragmented reconstructions (multiple sparse/0, sparse/1, etc.)
-- **Configurable Frame Density**: Control extraction rate with `--target_fps` parameter for quality vs. performance trade-offs
-- **High-Resolution Support**: Automatic handling of 4K and high-resolution videos with memory management
-- **Corrupted Video Recovery**: Handles videos with incorrect metadata or codec issues
-
-### **Best Practices:**
-- **Forest/Complex Scenes**: Use `--target_fps 4.0` for better overlap
-- **Long Videos**: Use `--target_fps 1.5` to limit frame count
-- **4K/High-Res Videos**: Use `--config train_very_low_memory --target_fps 2.0`
-- **Standard Processing**: Default `--target_fps 3.0` works well for most cases
 
 <a id="sec-training"></a>
 ## 🏋️ Training
@@ -288,7 +226,7 @@ wandb.mode=online wandb.project=EDGS wandb.entity=your_username train.gs_epochs=
 To run full evaluation on all datasets:
 
 ```bash
-python full_eval.py -m360 <mipnerf360 folder> -tat <tanks and temples folder> -db <deep blending folder>
+python script/full_eval.py -m360 <mipnerf360_folder> -tat <tanks_temples_folder> -db <deep_blending_folder>
 ```
 <a id="sec-reuse"></a>
 ## 🏗️ Reusing Our Model
@@ -318,11 +256,6 @@ source.corr_init.init_gaussians_with_corr(...)
       url={https://arxiv.org/abs/2504.13204}, 
 }
 ```
----
-
-# TODO:
-- [ ] Code for training and processing forward-facing scenes.
-- [ ] More data examples
 
 
 
