@@ -210,7 +210,7 @@ parser.add_argument(
     "--config",
     type=str,
     default="train",
-    help="Config name to use. Options: 'train' (standard), 'train_high_quality' (best quality, 12GB+ GPU), 'train_low_memory' (6-8GB GPU), 'train_very_low_memory' (4-6GB GPU). Default: train",
+    help="Config name to use. Options: 'train' (base config), 'train_01_highest_quality' (16GB+ GPU), 'train_02_high_quality' (12GB+ GPU), 'train_03_optimal_quality' (10GB+ GPU), 'train_04_medium_quality' (8GB+ GPU), 'train_05_low_quality' (6GB+ GPU), 'train_06_lowest_quality' (4GB+ GPU). Default: train",
 )
 parser.add_argument(
     "--output_path",
@@ -243,8 +243,8 @@ args = parser.parse_args()
 with initialize(config_path="../configs", version_base="1.1"):
     cfg = compose(config_name=args.config)
     print(f"\n📋 Using config: {args.config}")
-    if "low_memory" in args.config:
-        print("💾 Low memory mode enabled - densification disabled, reduced batch size")
+    if any(x in args.config for x in ["_04_", "_05_", "_06_", "medium_quality", "low_quality", "lowest_quality"]):
+        print("💾 Memory-optimized mode enabled - adjusted settings for lower GPU memory")
 
 SAME_WITH_GRADIO_DEMO = False
 if SAME_WITH_GRADIO_DEMO:
