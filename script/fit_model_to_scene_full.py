@@ -6,6 +6,11 @@
 # - ⚡ Faster convergence (only 25% of training time)
 #  - 🌀 Higher rendering quality
 #  - 💡 No need for progressive densification
+#
+# This script supports:
+# - Single video files (.mp4, .mov, .avi)
+# - Directories containing multiple videos
+# - Directories containing image sequences (.jpg, .png, .bmp)
 
 # ## 2. Import libraries
 import argparse
@@ -68,6 +73,28 @@ def find_videos_in_directory(directory_path, extensions=('.mp4', '.MP4', '.mov',
     return sorted(videos)
 
 
+def find_images_in_directory(directory_path, extensions=('.jpg', '.JPG', '.jpeg', '.JPEG', '.png', '.PNG', '.bmp', '.BMP')):
+    """
+    Find all image files in a directory.
+    
+    Args:
+        directory_path: Directory to search
+        extensions: Tuple of valid image file extensions
+        
+    Returns:
+        List of image paths
+    """
+    images = []
+    directory_path = Path(directory_path)
+    
+    # Only search in the immediate directory, not subdirectories
+    for file_path in directory_path.glob('*'):
+        if file_path.suffix in extensions:
+            images.append(str(file_path))
+    
+    return sorted(images)
+
+
 def copy_config_to_output(config_name, model_path):
     """Copy the config YAML file to the output directory for reference."""
     config_file = os.path.join(project_root, "configs", f"{config_name}.yaml")
@@ -77,6 +104,67 @@ def copy_config_to_output(config_name, model_path):
         print(f"Config copied to: {dest_file}")
     else:
         print(f"Warning: Config file not found: {config_file}")
+
+
+def process_images_to_colmap_scene(image_dir, output_path, max_image_size=1024, colmap_config="very_low_memory"):
+    """
+    Process directory of images and run COLMAP.
+    
+    Args:
+        image_dir: Directory containing image files
+        output_path: Directory to save COLMAP scene
+        max_image_size: Maximum dimension for images
+        colmap_config: COLMAP configuration preset
+        
+    Returns:
+        scene_dir: Path to COLMAP scene directory
+    """
+    print(f"🖼️ Processing images from directory: {image_dir}")
+    print(f"📁 Output directory: {output_path}")
+    
+    # Create output directory
+    os.makedirs(output_path, exist_ok=True)
+    images_dir = os.path.join(output_path, "images")
+    os.makedirs(images_dir, exist_ok=True)
+    
+    # Find all images
+    image_paths = find_images_in_directory(image_dir)
+    if not image_paths:
+        raise ValueError(f"No image files found in {image_dir}")
+    
+    print(f"📊 Found {len(image_paths)} images")
+    
+    # Copy/resize images to output directory
+    for idx, src_path in enumerate(image_paths):
+        # Read image
+        img = cv2.imread(src_path)
+        if img is None:
+            print(f"⚠️  Warning: Cannot read image: {src_path}, skipping...")
+            continue
+            
+        # Resize if needed
+        if max_image_size > 0:
+            h, w = img.shape[:2]
+            max_dim = max(h, w)
+            if max_dim > max_image_size:
+                scale = max_image_size / max_dim
+                new_w = int(w * scale)
+                new_h = int(h * scale)
+                img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        
+        # Save to output directory with sequential naming
+        dst_filename = f"{idx:08d}.jpg"
+        dst_path = os.path.join(images_dir, dst_filename)
+        cv2.imwrite(dst_path, img)
+    
+    print(f"✅ Processed {len(image_paths)} images")
+    
+    # Run COLMAP reconstruction
+    print("🏗️  Running COLMAP reconstruction...")
+    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_config)
+    
+    print(f"🎉 COLMAP processing complete!")
+    return output_path
 
 
 def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_image_size=1024, colmap_config="very_low_memory"):
@@ -190,7 +278,7 @@ def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_i
 
 # --- Add argument parsing ---
 parser = argparse.ArgumentParser(
-    description="Fit EDGS model to a scene from a video file or directory containing multiple videos."
+    description="Fit EDGS model to a scene from a video file, directory containing videos, or directory containing images."
 )
 parser.add_argument(
     "--video_path",
@@ -198,7 +286,7 @@ parser.add_argument(
     default=os.path.join(
         project_root, "assets", "examples", "video_fruits.mp4"
     ),  # Use project_root
-    help="Path to the input video file or directory containing video files.",
+    help="Path to the input video file, directory containing video files, or directory containing image files (jpg, png, etc.).",
 )
 parser.add_argument(
     "--colmap_output_path",
@@ -222,7 +310,7 @@ parser.add_argument(
     "--target_fps",
     type=float,
     default=3.0,
-    help="Target frames per second for video extraction. Higher values extract more frames. Default: 3.0",
+    help="Target frames per second for video extraction. Higher values extract more frames. Not used for image directories. Default: 3.0",
 )
 parser.add_argument(
     "--max_image_size",
@@ -297,34 +385,56 @@ if not use_existing_colmap:
     
     # Check if it's a directory or file
     if os.path.isdir(args.video_path):
-        videos = find_videos_in_directory(args.video_path)
-        if not videos:
-            print(f"Error: No video files found in directory: {args.video_path}")
-            sys.exit(1)
+        # First check if it contains images
+        images = find_images_in_directory(args.video_path)
+        if images:
+            print(f"Found {len(images)} images in directory")
+            # Process as image directory
+            try:
+                scene_dir = process_images_to_colmap_scene(
+                    image_dir=args.video_path,
+                    output_path=args.output_path if args.output_path else os.path.join(project_root, "outputs", "image_scene"),
+                    max_image_size=args.max_image_size,
+                    colmap_config=args.colmap_config
+                )
+            except Exception as e:
+                print(f"Error during image preprocessing: {e}")
+                sys.exit(1)
+        else:
+            # Check for videos
+            videos = find_videos_in_directory(args.video_path)
+            if not videos:
+                print(f"Error: No video or image files found in directory: {args.video_path}")
+                sys.exit(1)
     elif not os.path.isfile(args.video_path):
         print(f"Error: Path is neither a file nor directory: {args.video_path}")
         sys.exit(1)
     
-    # Set default colmap_output_path if not specified
-    if not args.colmap_output_path:
-        args.colmap_output_path = os.path.join(project_root, "outputs")
-        
-    print(f"Starting video processing for: {args.video_path}")
-    try:
-        # Use new uniform frame extraction that samples across entire video duration
-        scene_dir = process_video_to_colmap_scene(
-            video_path=args.video_path,
-            output_path=args.output_path,  # Use specified output path directly
-            target_fps=args.target_fps,
-            max_image_size=args.max_image_size,
-            colmap_config=args.colmap_config
-        )
-        if scene_dir is None:
-            print(f"Failed to process video {args.video_path}. Exiting.")
+    # Process based on whether it's images or video
+    if os.path.isdir(args.video_path) and find_images_in_directory(args.video_path):
+        # Already handled above
+        pass
+    else:
+        # Set default colmap_output_path if not specified
+        if not args.colmap_output_path:
+            args.colmap_output_path = os.path.join(project_root, "outputs")
+            
+        print(f"Starting video processing for: {args.video_path}")
+        try:
+            # Use new uniform frame extraction that samples across entire video duration
+            scene_dir = process_video_to_colmap_scene(
+                video_path=args.video_path,
+                output_path=args.output_path if args.output_path else args.colmap_output_path,  # Use specified output path directly
+                target_fps=args.target_fps,
+                max_image_size=args.max_image_size,
+                colmap_config=args.colmap_config
+            )
+            if scene_dir is None:
+                print(f"Failed to process video {args.video_path}. Exiting.")
+                sys.exit(1)
+        except Exception as e:
+            print(f"Error during video preprocessing: {e}")
             sys.exit(1)
-    except Exception as e:
-        print(f"Error during video preprocessing: {e}")
-        sys.exit(1)
 
 # Set up paths for EDGS
 cfg.gs.dataset.source_path = scene_dir
@@ -486,41 +596,3 @@ with torch.no_grad():
 # ### Save model
 with torch.no_grad():
     trainer.save_model()
-
-
-# # # 7. Continue training until we reach total 30K training steps
-# cfg.train.gs_epochs = 25_000
-# trainer.train(cfg.train)
-
-
-# # ### Visualize same viewpoints
-# with torch.no_grad():
-#     for viewpoint_cam in viewpoint_cams_to_viz:
-#         render_pkg = trainer.GS(viewpoint_cam)
-#         image = render_pkg["render"]
-
-#         image_np = image.clone().detach().cpu().numpy().transpose(1, 2, 0)
-#         image_gt_np = (
-#             viewpoint_cam.original_image.clone()
-#             .detach()
-#             .cpu()
-#             .numpy()
-#             .transpose(1, 2, 0)
-#         )
-
-#         # Clip values to be in the range [0, 1]
-#         image_np = np.clip(image_np * 255, 0, 255).astype(np.uint8)
-#         image_gt_np = np.clip(image_gt_np * 255, 0, 255).astype(np.uint8)
-
-#         fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(12, 6))
-#         ax[0].imshow(image_gt_np)
-#         ax[0].axis("off")
-#         ax[1].imshow(image_np)
-#         ax[1].axis("off")
-#         plt.tight_layout()
-#         plt.show()
-
-
-# ### Save model
-# with torch.no_grad():
-#     trainer.save_model()
