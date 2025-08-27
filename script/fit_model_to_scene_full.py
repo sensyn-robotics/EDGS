@@ -500,11 +500,37 @@ if args.max_image_size > 0:
     print(f"Setting resolution scale to {cfg.gs.dataset.resolution} based on max_image_size={args.max_image_size}")
 
 set_seed(cfg.seed)
+
+# Check CUDA availability and initialize
+if torch.cuda.is_available():
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    print(f"CUDA device count: {torch.cuda.device_count()}")
+    print(f"Current CUDA device: {torch.cuda.current_device()}")
+    print(f"CUDA device name: {torch.cuda.get_device_name(0)}")
+    # Initialize CUDA to avoid lazy initialization issues
+    torch.cuda.init()
+    torch.cuda.empty_cache()
+else:
+    print("WARNING: CUDA is not available. The model requires GPU.")
+    sys.exit(1)
+
 # Init output folder
 print("Output folder: {}".format(cfg.gs.dataset.model_path))
 os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
 # Init gs model
-gs = hydra.utils.instantiate(cfg.gs)
+try:
+    gs = hydra.utils.instantiate(cfg.gs)
+except RuntimeError as e:
+    if "CUDA" in str(e):
+        print("\nCUDA initialization error detected!")
+        print("Please try the following:")
+        print("1. Restart the Docker container: docker compose restart")
+        print("2. Check GPU availability: nvidia-smi")
+        print("3. Ensure CUDA_VISIBLE_DEVICES is set correctly before running the script")
+        print(f"\nOriginal error: {e}")
+        sys.exit(1)
+    else:
+        raise
 trainer = EDGSTrainer(
     GS=gs,
     training_config=cfg.gs.opt,
