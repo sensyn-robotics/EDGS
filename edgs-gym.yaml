@@ -1,0 +1,16 @@
+experiment_name: "edgs"
+workspace: "ml-misc-dev-ml"
+environment: 
+  name: "sensynmldev.azurecr.io/edgs-app"
+  version: "latest"
+compute: "lambda-cluster"
+command: "python script/fit_model_to_scene_full.py --video_path data"
+models: # optional
+  model_1: "your-model:1"
+data: # optional
+  train_1: "your-dataset-train-1:1"
+  train_2: "your-dataset-train-2:1"
+  val_1: "your-dataset-val-1:1"
+  test_1: "your-dataset-test-1:1"
+metadata: # optional
+  task: "image_classification"
