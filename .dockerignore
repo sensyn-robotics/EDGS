@@ -24,3 +24,5 @@ venv/
 *.yaml
 *.yml
 submodules/
+outputs/
+data/
