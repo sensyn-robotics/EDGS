@@ -4,8 +4,8 @@ environment:
   name: "sensynmldev.azurecr.io/edgs-app"
   version: "latest"
 compute: "NC24ads-A100"
-command: "bash -c 'source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && python script/fit_model_to_scene_full.py --colmap_output_path tower_circle_flight --config train_01_highest_quality --output_path outputs/tower_circle_flight'"
+command: "source /opt/conda/etc/profile.d/conda.sh && conda activate edgs && python script/fit_model_to_scene_full.py --config train_01_highest_quality --output_path outputs/tower_circle_flight"
 data: # optional
-  video_path: "tower_circle_flight/images"
+  colmap_output_path: "tower_circle_flight"
 metadata: # optional
   task: "gaussian_splatting"
