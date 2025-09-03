@@ -54,7 +54,7 @@ RUN /bin/bash -c "source activate edgs && \
   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
   pip install -e ./submodules/gaussian-splatting/submodules/diff-gaussian-rasterization && \
   pip install -e ./submodules/gaussian-splatting/submodules/simple-knn && \
-  pip install pycolmap wandb hydra-core tqdm torchmetrics lpips matplotlib rich plyfile imageio imageio-ffmpeg && \
+  pip install pycolmap wandb hydra-core tqdm torchmetrics lpips matplotlib rich plyfile imageio imageio-ffmpeg opencv-python && \
   pip install -e ./submodules/RoMa && \
   pip install gradio plotly scikit-learn moviepy==2.1.1 ffmpeg open3d jupyterlab matplotlib"
 
