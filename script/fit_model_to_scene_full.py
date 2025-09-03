@@ -364,18 +364,34 @@ print(OmegaConf.to_yaml(cfg))
 # # 3. Init input parameters
 
 # ## 3.1 Set up scene directory
+# Debug: Print paths to understand what Azure is passing
+print(f"DEBUG: colmap_output_path argument: {args.colmap_output_path}")
+print(f"DEBUG: video_path argument: {args.video_path}")
+if args.colmap_output_path:
+    print(f"DEBUG: colmap_output_path exists: {os.path.exists(args.colmap_output_path)}")
+    if os.path.exists(args.colmap_output_path):
+        print(f"DEBUG: Contents of colmap_output_path: {os.listdir(args.colmap_output_path)}")
+
 # Check if colmap_output_path exists and is a valid COLMAP scene
 use_existing_colmap = False
 if args.colmap_output_path and os.path.exists(args.colmap_output_path):
     # Check if it's a valid COLMAP scene
     sparse_dir = os.path.join(args.colmap_output_path, "sparse", "0")
+    print(f"DEBUG: Looking for sparse dir at: {sparse_dir}")
+    print(f"DEBUG: Sparse dir exists: {os.path.exists(sparse_dir)}")
     if os.path.exists(sparse_dir):
+        print(f"DEBUG: Contents of sparse dir: {os.listdir(sparse_dir)}")
         required_files = ["cameras.bin", "images.bin", "points3D.bin"]
         missing_files = [f for f in required_files if not os.path.exists(os.path.join(sparse_dir, f))]
+        print(f"DEBUG: Missing files: {missing_files}")
         if not missing_files:
             use_existing_colmap = True
             scene_dir = args.colmap_output_path
             print(f"Using existing COLMAP scene: {scene_dir}")
+        else:
+            print(f"WARNING: COLMAP scene incomplete, missing: {missing_files}")
+    else:
+        print(f"WARNING: Sparse directory not found at: {sparse_dir}")
 
 if not use_existing_colmap:
     # Process video to create COLMAP scene
