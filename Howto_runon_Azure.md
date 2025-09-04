@@ -108,10 +108,18 @@ environment:
 compute: "NC24ads-A100"  # Your GPU compute cluster name
 command: "python script/fit_model_to_scene_full.py --config train_02_high_quality --output_path outputs/experiment_name"
 data:  # optional - use for Azure ML datasets
-  video_path: "ADA360"  # Your Azure ML dataset name
+  video_path: "otowa360"  # Your Azure ML dataset name
 metadata:  # optional
   task: "gaussian_splatting"
   description: "EDGS training on Azure ML"
+```
+
+#### Note
+To pass only 1 video on the data directory, you can write like this.
+```yaml
+command: "python script/fit_model_to_scene_full.py --video_path $video_path/S1000275.MP4"
+data:
+  video_path: "tower_closeup_flight"
 ```
 
 ### 4.2 Configuration Parameters Explained

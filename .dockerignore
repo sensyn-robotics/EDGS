@@ -26,3 +26,7 @@ venv/
 submodules/
 outputs/
 data/
+assets/
+.claude/
+.vscode/
+notebooks/
