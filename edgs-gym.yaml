@@ -4,8 +4,8 @@ environment:
   name: "sensynmldev.azurecr.io/edgs-app"
   version: "latest"
 compute: "NC24ads-A100"
-command: "python script/fit_model_to_scene_full.py --target_fps 1 --max_image_size 1920 --colmap_config balanced  --config train_02_high_quality --output_path outputs/tower_close_flight"
+command: "python script/fit_model_to_scene_full.py --video_path $video_path/S1000275.MP4 --target_fps 1 --max_image_size 1920 --colmap_config balanced --config train_02_high_quality --output_path outputs/tower_close_flight"
 data: # optional
-  video_path: "tower_closeup_flight/S1000275.MP4"
+  video_path: "tower_closeup_flight"
 metadata: # optional
   task: "gaussian_splatting"
