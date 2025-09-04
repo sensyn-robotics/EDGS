@@ -1,6 +1,5 @@
-# EDGS Azure ML Deployment Guide
-
-This guide provides step-by-step instructions for deploying the EDGS (Eliminating Densification for Gaussian Splatting) application to Azure Machine Learning using sensynml and sensyn-gym.
+# Your Docker on Azure ML Deployment Guide
+This guide provides step-by-step instructions for deploying Docker file ( I use the EDGS (Eliminating Densification for Gaussian Splatting for example) application to Azure Machine Learning using sensynml and sensyn-gym.
 
 ## Prerequisites
 
