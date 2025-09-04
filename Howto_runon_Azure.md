@@ -71,25 +71,25 @@ You have two options for data management:
 
 #### Option B: Large Datasets (> 500MB)
 - Upload as Azure ML datasets
-- Use Azure Storage Explorer or Azure ML Studio
+- Use Azure Storage Explorer and Azure ML Studio
 
 ### 3.2 Creating an Azure ML Dataset
 
-#### Using Azure Storage Explorer:
+#### 3.2.1 Upload data to Azure using Azure Storage Explorer:
 
 1. Open Azure Storage Explorer
-2. Navigate to your ML workspace storage account
+2. Navigate to your ML workspace storage account (If you cannot see your workspace, you need to login to Azure in Azure Storage Explorer)
 3. Create a new container or use existing one (e.g. powergridcheckdev/blob Containers/dataset/)
-4. Upload your data folder (e.g., `otowa360/images/`)
+4. Upload your data folder by drag and dropping (e.g., `otowa360/images/`)
 5. Note the path for dataset creation
 
-#### Using Azure ML Studio:
+#### 3.2.2 Register data on Azure ML Studio:
 
 1. Go to Azure ML Studio
 2. Navigate to "Data" section
 3. Click "Create dataset" → "From datastore"
 4. Select your uploaded data location
-5. Name your dataset (e.g., "ADA360")
+5. Name your dataset (e.g., "otowa360")
 6. Register the dataset
 
 ## Step 4: Configure sensyn-gym YAML

@@ -6,6 +6,6 @@ environment:
 compute: "NC24ads-A100"
 command: "python script/fit_model_to_scene_full.py --colmap_config colmap_balanced  --config train_02_high_quality --output_path outputs/tower_close_flight"
 data: # optional
-  video_path: "tower_circle_flighttower_closeup_flight/S1000275.MP4"
+  video_path: "tower_closeup_flight/S1000275.MP4"
 metadata: # optional
   task: "gaussian_splatting"
