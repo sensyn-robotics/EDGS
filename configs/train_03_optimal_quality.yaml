@@ -9,7 +9,7 @@ defaults:
 # EDGS core settings
 train:
   no_densify: True  # EDGS principle
-  gs_epochs: 30000  # Full training iterations
+  gs_epochs: 60000  # Full training iterations
   reduce_opacity: True
   max_lr: True
 

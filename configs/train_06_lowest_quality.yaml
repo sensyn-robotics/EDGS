@@ -8,8 +8,8 @@ defaults:
 
 # EDGS core with absolute minimal memory
 train:
-  no_densify: True  # Essential EDGS principle
-  gs_epochs: 15000  # Further reduced iterations
+  no_densify: False  # Essential EDGS principle
+  gs_epochs: 30000  # Further reduced iterations
   reduce_opacity: True  # Enable opacity reduction
   max_lr: True  # Use max learning rate for faster convergence
 

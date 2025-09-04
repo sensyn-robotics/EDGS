@@ -9,7 +9,7 @@ defaults:
 # EDGS with high-quality settings
 train:
   no_densify: True  # EDGS principle - better initialization instead of densification
-  gs_epochs: 60000  # More training iterations for convergence
+  gs_epochs: 100000  # More training iterations for convergence
   reduce_opacity: True  # Enable opacity reduction for cleanup
   max_lr: True      # Use max learning rate for faster convergence
 

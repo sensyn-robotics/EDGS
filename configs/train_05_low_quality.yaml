@@ -9,7 +9,7 @@ defaults:
 # EDGS core - disable densification to save memory
 train:
   no_densify: False  # Enable limited densification for better quality
-  gs_epochs: 80000   # Even more epochs for convergence with densification
+  gs_epochs: 30000   # Even more epochs for convergence with densification
   reduce_opacity: True  # Help clean up bad gaussians
   max_lr: True  # Use max learning rate for better convergence
 

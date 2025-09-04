@@ -8,7 +8,7 @@ defaults:
 
 # EDGS core settings for progressive training
 train:
-  no_densify: False  # Allow densification in later stages
+  no_densify: True  # Allow densification in later stages
   gs_epochs: 100000  # Much longer training for better convergence
   reduce_opacity: True
   max_lr: True

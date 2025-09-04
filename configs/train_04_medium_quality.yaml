@@ -8,8 +8,8 @@ defaults:
 
 # EDGS core - selective densification control
 train:
-  no_densify: False  # Allow limited densification for better quality
-  gs_epochs: 20000   # Increased iterations for better convergence
+  no_densify: True  # Allow limited densification for better quality
+  gs_epochs: 30000   # Increased iterations for better convergence
   reduce_opacity: True
   max_lr: True
 
