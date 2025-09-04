@@ -12,7 +12,7 @@ This guide provides step-by-step instructions for deploying the EDGS (Eliminatin
 
 ## Step 1: Build and Prepare Docker Image
 
-### 1.1 Build the EDGS Docker Image
+### 1.1 Build the Docker Image
 
 ```bash
 # Navigate to your project directory
@@ -35,7 +35,7 @@ edgs-app    latest    <IMAGE_ID>    <TIME>    34GB
 ```
 
 ## Step 2: Upload Docker Image to Azure Container Registry
-
+ref: [sensynml](https://github.com/sensyn-robotics/sensynml)
 ### 2.1 Tag the Image for Azure Registry
 
 ```bash
@@ -148,70 +148,35 @@ Your GPU compute cluster must have:
 az ml compute show --name <compute-name> --workspace-name <workspace-name>
 ```
 
-## Step 6: Training Configuration Options
+## Step 6: Submit Job to Azure ML
 
-### 6.1 Memory-Optimized Configurations
-
-Based on your GPU memory, use appropriate config:
-
-```yaml
-# For the command parameter in edgs-gym.yaml:
-
-# Highest quality (16GB+ GPU)
-command: "python script/fit_model_to_scene_full.py --config train_01_highest_quality --output_path outputs/experiment"
-
-# High quality (12GB+ GPU)
-command: "python script/fit_model_to_scene_full.py --config train_02_high_quality --output_path outputs/experiment"
-
-# Optimal quality (10GB+ GPU)
-command: "python script/fit_model_to_scene_full.py --config train_03_optimal_quality --output_path outputs/experiment"
-
-# Medium quality (8GB+ GPU)
-command: "python script/fit_model_to_scene_full.py --config train_04_medium_quality --output_path outputs/experiment"
-
-# Low quality (6GB+ GPU)
-command: "python script/fit_model_to_scene_full.py --config train_05_low_quality --output_path outputs/experiment"
-
-# Lowest quality (4GB+ GPU)
-command: "python script/fit_model_to_scene_full.py --config train_06_lowest_quality --output_path outputs/experiment"
-```
-
-### 6.2 COLMAP Configuration Options
-
-For video preprocessing, add COLMAP config:
-
-```yaml
-# Add to command for different memory constraints:
---colmap_config very_low_memory  # 4-6GB systems
---colmap_config low_memory       # 6-8GB systems
---colmap_config balanced         # 8-12GB systems
---colmap_config high_accuracy    # 16GB+ systems
-```
-
-## Step 7: Submit Job to Azure ML
-
-### 7.1 Using sensyn-gym CLI
-
+### 6.a Using sensyn-gym CLI
+ref: [sensyn-gym](https://github.com/sensyn-robotics/sensyn-gym)
 ```bash
 # Submit the job using sensyn-gym
-sensyn-gym submit --config edgs-gym.yaml
+cd sensyn-gym 
+poetry run gym <yourproject> -c <yourgym.yaml>
+```
+In EDGS case,
+```bash
+poetry run gym ../EDGS/ -c edgs-gym.yaml
 ```
 
-### 7.2 Using Azure ML CLI
+### 6.b Using Azure ML CLI
 
 ```bash
 # Alternative: Direct Azure ML submission
 az ml job create --file edgs-gym.yaml --workspace-name <workspace-name>
 ```
 
-## Step 8: Monitor and Retrieve Results
+## Step 7: Monitor and Retrieve Results
 
-### 8.1 Monitor Job Progress
+### 7.1 Monitor Job Progress
 
 - Azure ML Studio: Navigate to "Experiments" → Your experiment name
 - CLI: `az ml job show --name <job-name> --workspace-name <workspace-name>`
 
-### 8.2 Download Results
+### 7.2 Download Results
 
 ```bash
 # Download outputs after completion
@@ -245,6 +210,7 @@ az ml job download --name <job-name> --workspace-name <workspace-name> --output-
    - Verify Docker image exists in ACR
    - Review command syntax in gym.yaml
 
+
 ## Best Practices
 
 1. **Image Management**
@@ -266,56 +232,3 @@ az ml job download --name <job-name> --workspace-name <workspace-name> --output-
    - Use spot instances for non-critical training
    - Set appropriate job timeout limits
    - Clean up unused resources
-
-## Example Full Workflow
-
-```bash
-# 1. Build and tag image
-docker build -t edgs-app:latest .
-docker tag edgs-app:latest sensynmldev.azurecr.io/edgs-app:v1.0
-
-# 2. Push to ACR
-docker login sensynmldev.azurecr.io
-docker push sensynmldev.azurecr.io/edgs-app:v1.0
-
-# 3. Create dataset in Azure ML Studio
-# Upload data and register as "tower_dataset"
-
-# 4. Create gym config
-cat > edgs-gym.yaml << EOF
-experiment_name: "edgs_tower_training"
-workspace: "power-grid-check-dev-ml"
-environment: 
-  name: "sensynmldev.azurecr.io/edgs-app"
-  version: "v1.0"
-compute: "NC24ads-A100"
-command: "python script/fit_model_to_scene_full.py --config train_tower_psnr25 --output_path outputs/tower"
-data:
-  video_path: "tower_dataset"
-metadata:
-  task: "gaussian_splatting"
-  dataset: "tower"
-  quality: "psnr25"
-EOF
-
-# 5. Submit job
-sensyn-gym submit --config edgs-gym.yaml
-
-# 6. Monitor in Azure ML Studio or CLI
-az ml job list --workspace-name power-grid-check-dev-ml
-```
-
-## Additional Resources
-
-- [Azure ML Documentation](https://docs.microsoft.com/azure/machine-learning/)
-- [Docker Documentation](https://docs.docker.com/)
-- [EDGS Project README](./README.md)
-- [Training Configuration Guide](./configs/README.md)
-
-## Support
-
-For issues specific to:
-- EDGS implementation: Check project issues on GitHub
-- Azure ML setup: Contact your Azure administrator
-- sensyn-gym: Refer to sensyn-gym documentation
-- Docker/ACR: Check Azure Container Registry documentation

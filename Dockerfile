@@ -69,11 +69,24 @@ RUN useradd -m -s /bin/bash claude_user && \
 # Switch to non-root user
 USER claude_user
 
-# Set up conda for the new user
+# Set up conda for the new user and make it the default
 RUN echo "source activate edgs" >> ~/.bashrc
+
+# Set environment variables to make conda environment active by default
+ENV CONDA_DEFAULT_ENV=edgs
+ENV CONDA_PREFIX=/opt/conda/envs/edgs
+ENV PATH=/opt/conda/envs/edgs/bin:$PATH
+ENV CONDA_PYTHON_EXE=/opt/conda/envs/edgs/bin/python
+
+# Create an entrypoint script that ensures conda env is active
+RUN echo '#!/bin/bash\nsource /opt/conda/etc/profile.d/conda.sh\nconda activate edgs\nexec "$@"' > /home/claude_user/entrypoint.sh && \
+    chmod +x /home/claude_user/entrypoint.sh
 
 # Expose the port for Gradio
 EXPOSE 7862
 
-# Keep the container running in detached mode
+# Set the entrypoint to ensure conda env is always active
+ENTRYPOINT ["/home/claude_user/entrypoint.sh"]
+
+# Default command
 CMD ["tail", "-f", "/dev/null"]
