@@ -52,6 +52,59 @@ logging.basicConfig(
 )
 
 
+def check_colmap_scene(directory_path):
+    """
+    Check if a directory contains a valid COLMAP scene.
+    
+    Args:
+        directory_path: Directory to check
+        
+    Returns:
+        bool: True if valid COLMAP scene exists
+    """
+    if not os.path.isdir(directory_path):
+        return False
+    
+    # Check for required COLMAP directories/files
+    sparse_dir = os.path.join(directory_path, "sparse")
+    if not os.path.exists(sparse_dir):
+        return False
+    
+    # Check for model folders (0, 1, etc.) or direct files
+    has_model = False
+    
+    # Check numbered model directories
+    for i in range(10):  # Check first 10 possible model folders
+        model_dir = os.path.join(sparse_dir, str(i))
+        if os.path.exists(model_dir):
+            # Check for essential COLMAP files
+            cameras = os.path.join(model_dir, "cameras.bin")
+            images = os.path.join(model_dir, "images.bin")
+            points = os.path.join(model_dir, "points3D.bin")
+            
+            cameras_txt = os.path.join(model_dir, "cameras.txt")
+            images_txt = os.path.join(model_dir, "images.txt")
+            points_txt = os.path.join(model_dir, "points3D.txt")
+            
+            if (os.path.exists(cameras) and os.path.exists(images)) or \
+               (os.path.exists(cameras_txt) and os.path.exists(images_txt)):
+                has_model = True
+                break
+    
+    # Also check for direct files in sparse directory
+    if not has_model:
+        cameras = os.path.join(sparse_dir, "cameras.bin")
+        images = os.path.join(sparse_dir, "images.bin")
+        cameras_txt = os.path.join(sparse_dir, "cameras.txt")
+        images_txt = os.path.join(sparse_dir, "images.txt")
+        
+        if (os.path.exists(cameras) and os.path.exists(images)) or \
+           (os.path.exists(cameras_txt) and os.path.exists(images_txt)):
+            has_model = True
+    
+    return has_model
+
+
 def find_videos_in_directory(directory_path, extensions=('.mp4', '.MP4', '.mov', '.MOV', '.avi', '.AVI')):
     """
     Recursively find all video files in a directory and its subdirectories.
@@ -397,16 +450,10 @@ def parse_arguments():
         description="Fit EDGS model to a scene from video/images."
     )
     parser.add_argument(
-        "--video_path",
+        "--input",
         type=str,
         default=os.path.join(project_root, "assets", "examples", "video_fruits.mp4"),
-        help="Path to input video file, directory with videos, or directory with images.",
-    )
-    parser.add_argument(
-        "--colmap_output_path",
-        type=str,
-        default=None,
-        help="Path to COLMAP scene directory. If exists, uses it; otherwise creates it.",
+        help="Path to input: COLMAP scene, image directory, video directory, or single video file.",
     )
     parser.add_argument(
         "--config",
@@ -452,57 +499,62 @@ def prepare_scene_directory(args):
     Returns:
         scene_dir: Path to COLMAP scene directory
     """
-    # Check for existing COLMAP scene
-    if check_existing_colmap_scene(args.colmap_output_path):
-        print(f"✅ Using existing COLMAP scene: {args.colmap_output_path}")
-        return args.colmap_output_path
-    
-    # Need to create new COLMAP scene
-    if not os.path.exists(args.video_path):
-        print(f"ERROR: Input path does not exist: {args.video_path}")
+    # Check if input exists
+    if not os.path.exists(args.input):
+        print(f"ERROR: Input path does not exist: {args.input}")
         sys.exit(1)
     
-    # Determine output path for COLMAP
-    if not args.colmap_output_path:
-        args.colmap_output_path = os.path.join(project_root, "outputs")
+    # Set default base output path for generated COLMAP scenes
+    base_output_path = args.output_path or os.path.join(project_root, "outputs")
     
     # Process based on input type
-    if os.path.isdir(args.video_path):
-        # Check if it contains images
-        images = find_images_in_directory(args.video_path)
+    if os.path.isdir(args.input):
+        # Priority 1: Check if it's a COLMAP scene
+        if check_colmap_scene(args.input):
+            print(f"✅ Found existing COLMAP scene: {args.input}")
+            return args.input
+        
+        # Priority 2: Check for images in the directory
+        images = find_images_in_directory(args.input)
         if images:
             print(f"📸 Found {len(images)} images in directory")
             scene_dir = process_images_to_colmap_scene(
-                image_dir=args.video_path,
-                output_path=args.output_path or os.path.join(project_root, "outputs", "image_scene"),
+                image_dir=args.input,
+                output_path=os.path.join(base_output_path, "image_scene"),
                 max_image_size=args.max_image_size,
                 colmap_config=args.colmap_config
             )
-        else:
-            # Check for videos
-            videos = find_videos_in_directory(args.video_path)
-            if not videos:
-                print(f"ERROR: No video or image files found in: {args.video_path}")
-                sys.exit(1)
-            
+            return scene_dir
+        
+        # Priority 3: Check for videos in the directory
+        videos = find_videos_in_directory(args.input)
+        if videos:
+            print(f"🎥 Found {len(videos)} video(s) in directory")
             scene_dir = process_video_to_colmap_scene(
-                video_path=args.video_path,
-                output_path=args.output_path or args.colmap_output_path,
+                video_path=args.input,
+                output_path=os.path.join(base_output_path, "video_scene"),
                 target_fps=args.target_fps,
                 max_image_size=args.max_image_size,
                 colmap_config=args.colmap_config
             )
+            return scene_dir
+        
+        print(f"ERROR: No COLMAP scene, images, or videos found in: {args.input}")
+        sys.exit(1)
+    
     else:
-        # Single video file
+        # Single file - assume it's a video
+        if not args.input.lower().endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm')):
+            print(f"⚠️ Warning: {args.input} may not be a video file, attempting to process anyway...")
+        
         scene_dir = process_video_to_colmap_scene(
-            video_path=args.video_path,
-            output_path=args.output_path or args.colmap_output_path,
+            video_path=args.input,
+            output_path=os.path.join(base_output_path, "video_scene"),
             target_fps=args.target_fps,
             max_image_size=args.max_image_size,
             colmap_config=args.colmap_config
         )
-    
-    return scene_dir
+        return scene_dir
 
 
 def configure_resolution(cfg, max_image_size):
