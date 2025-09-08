@@ -58,7 +58,7 @@ def extract_frames_with_imageio(video_path, output_dir, num_frames, max_size):
                             frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
                     
                     # Save frame
-                    output_filename = f"{i:08d}.jpg"
+                    output_filename = f"{i:08d}.png"
                     output_path = os.path.join(output_dir, output_filename)
                     
                     # Convert RGB to BGR for OpenCV
@@ -67,7 +67,7 @@ def extract_frames_with_imageio(video_path, output_dir, num_frames, max_size):
                     else:
                         frame_bgr = frame
                     
-                    success = cv2.imwrite(output_path, frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                    success = cv2.imwrite(output_path, frame_bgr, [cv2.IMWRITE_PNG_COMPRESSION, 1])
                     if success:
                         extracted_paths.append(output_path)
                     else:
@@ -116,13 +116,13 @@ def extract_frames_with_ffmpeg(video_path, output_dir, num_frames, max_size):
         with tqdm(total=num_frames, desc="Extracting with ffmpeg", unit="frame") as pbar:
             for i in range(num_frames):
                 time_pos = i * time_interval
-                output_filename = f"{i:08d}.jpg"
+                output_filename = f"{i:08d}.png"
                 output_path = os.path.join(output_dir, output_filename)
                 
                 # Build ffmpeg command for extracting single frame at specific time
                 cmd = [
                     'ffmpeg', '-y', '-ss', str(time_pos), '-i', video_path, 
-                    '-vframes', '1', '-q:v', '2'
+                    '-vframes', '1', '-c:v', 'png'
                 ]
                 
                 # Add scaling if needed
@@ -221,10 +221,10 @@ def extract_frames_sequential_with_skipping(video_path, output_dir, num_frames, 
                         frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
                 
                 # Save frame
-                frame_filename = f"{len(extracted_paths):08d}.jpg"
+                frame_filename = f"{len(extracted_paths):08d}.png"
                 frame_path = os.path.join(output_dir, frame_filename)
                 
-                success = cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+                success = cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 1])
                 if success:
                     extracted_paths.append(frame_path)
                     pbar.update(1)
@@ -237,6 +237,48 @@ def extract_frames_sequential_with_skipping(video_path, output_dir, num_frames, 
         raise RuntimeError("No frames were successfully extracted!")
     
     return extracted_paths
+
+def get_video_duration_safe(video_path):
+    """
+    Get video duration in seconds using multiple methods.
+    
+    Args:
+        video_path: Path to video file
+        
+    Returns:
+        duration in seconds, or None if unable to determine
+    """
+    # Try ffprobe first (most reliable)
+    try:
+        import subprocess
+        result = subprocess.run([
+            'ffprobe', '-v', 'quiet', '-show_entries', 
+            'format=duration', '-of', 'csv=p=0', video_path
+        ], capture_output=True, text=True, check=True)
+        
+        duration = float(result.stdout.strip())
+        if duration > 0:
+            return duration
+    except:
+        pass
+    
+    # Try OpenCV
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        return None
+    
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    
+    # Check if metadata looks reasonable (not corrupted)
+    if fps > 0 and fps < 1000 and frame_count > 0 and frame_count < 1000000:
+        duration = frame_count / fps
+        if duration > 0:
+            return duration
+    
+    return None
+
 
 def extract_frames_uniformly(video_path, output_dir, num_frames=800, max_size=1024):
     """
@@ -336,10 +378,10 @@ def extract_frames_uniformly(video_path, output_dir, num_frames=800, max_size=10
                     frame = cv2.resize(frame, (new_w, new_h), interpolation=cv2.INTER_AREA)
             
             # Save frame
-            frame_filename = f"{i:08d}.jpg"
+            frame_filename = f"{i:08d}.png"
             frame_path = os.path.join(output_dir, frame_filename)
             
-            success = cv2.imwrite(frame_path, frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            success = cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 1])
             if success:
                 extracted_paths.append(frame_path)
             else:

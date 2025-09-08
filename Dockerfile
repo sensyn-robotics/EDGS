@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
   ninja-build \
   libgl1-mesa-glx \
   libglib2.0-0 \
+  ffmpeg \
   && rm -rf /var/lib/apt/lists/*
 
 # Install Node.js (required for Claude Code)
