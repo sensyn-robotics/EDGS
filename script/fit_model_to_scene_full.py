@@ -666,7 +666,7 @@ def main():
     
     # Save the final model
     print("\n💾 Saving final model...")
-    trainer.save_ply(os.path.join(model_path, "final_point_cloud.ply"))
+    trainer.save_model()
     
     print("\n✨ Training complete!")
     print(f"Results saved to: {model_path}")
