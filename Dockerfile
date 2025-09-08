@@ -3,22 +3,26 @@ FROM nvidia/cuda:12.1.1-devel-ubuntu22.04
 # Set the working directory
 WORKDIR /EDGS
 
-# Install system dependencies first, including git, build-essential, and cmake
-RUN apt-get update && apt-get install -y \
-  git \
-  wget \
-  curl \
-  build-essential \
-  cmake \
-  ninja-build \
-  libgl1-mesa-glx \
-  libglib2.0-0 \
-  ffmpeg \
-  && rm -rf /var/lib/apt/lists/*
-
-# Install Node.js (required for Claude Code)
-RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
-  apt-get install -y nodejs
+# Install all system dependencies including Node.js
+RUN apt-get update && \
+  apt-get install -y \
+    git \
+    wget \
+    curl \
+    build-essential \
+    cmake \
+    ninja-build \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    ffmpeg \
+    ca-certificates \
+    gnupg && \
+  mkdir -p /etc/apt/keyrings && \
+  curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
+  echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_18.x nodistro main" > /etc/apt/sources.list.d/nodesource.list && \
+  apt-get update && \
+  apt-get install -y nodejs && \
+  rm -rf /var/lib/apt/lists/*
 
 # Copy only essential files for cloning submodules first (e.g., .gitmodules)
 # Or, if submodules are public, you might not need to copy anything specific for this step
