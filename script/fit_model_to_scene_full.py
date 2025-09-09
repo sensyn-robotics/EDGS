@@ -23,6 +23,7 @@ import random
 import sys
 import shutil
 import subprocess
+import yaml
 from pathlib import Path
 
 import cv2
@@ -148,30 +149,40 @@ def find_images_in_directory(directory_path, extensions=('.png', '.PNG', '.jpg',
     return sorted(images)
 
 
-def copy_config_to_output(config_name, model_path):
-    """Copy the config YAML file to the output directory for reference."""
+def save_configs_to_output(train_config_name, colmap_config_name, model_path):
+    """Save both training and colmap configuration files to output directory."""
     try:
-        config_file = f"../configs/{config_name}.yaml"
-        config_path = os.path.join(os.path.dirname(__file__), config_file)
-        if os.path.exists(config_path):
-            dst = os.path.join(model_path, f"{config_name}.yaml")
-            shutil.copy2(config_path, dst)
-            print(f"Config file copied to: {dst}")
+        # Save training config
+        train_config_file = f"../configs/{train_config_name}.yaml"
+        train_config_path = os.path.join(os.path.dirname(__file__), train_config_file)
+        if os.path.exists(train_config_path):
+            dst = os.path.join(model_path, "train_config.yaml")
+            shutil.copy2(train_config_path, dst)
+            print(f"📋 Training config saved to: {dst}")
         else:
-            print(f"Config file not found: {config_path}")
+            print(f"⚠️ Training config file not found: {train_config_path}")
+        
+        # Save colmap config
+        colmap_config_file = f"../configs/colmap_{colmap_config_name}.yaml"
+        colmap_config_path = os.path.join(os.path.dirname(__file__), colmap_config_file)
+        if os.path.exists(colmap_config_path):
+            dst = os.path.join(model_path, "colmap_config.yaml")
+            shutil.copy2(colmap_config_path, dst)
+            print(f"📋 COLMAP config saved to: {dst}")
+        else:
+            print(f"⚠️ COLMAP config file not found: {colmap_config_path}")
     except Exception as e:
-        print(f"Warning: Could not copy config file: {e}")
+        print(f"Warning: Could not copy config files: {e}")
 
 
-def process_images_to_colmap_scene(image_dir, output_path, max_image_size=1024, colmap_config="very_low_memory"):
+def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
     """
     Process a directory of images with COLMAP.
     
     Args:
         image_dir: Directory containing images
         output_path: Directory to save COLMAP scene
-        max_image_size: Maximum dimension for images
-        colmap_config: COLMAP configuration preset
+        colmap_cfg: COLMAP configuration dictionary with preprocessing settings
         
     Returns:
         scene_dir: Path to COLMAP scene directory
@@ -217,7 +228,7 @@ def process_images_to_colmap_scene(image_dir, output_path, max_image_size=1024, 
     
     # Run COLMAP reconstruction
     print("🏗️  Running COLMAP reconstruction...")
-    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_config)
+    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
     
     print(f"🎉 COLMAP processing complete!")
     return output_path
@@ -276,6 +287,7 @@ def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_i
         else:
             # Get actual video duration and calculate frames based on target_fps
             duration = get_video_duration_safe(video_file)
+            target_fps = colmap_cfg.get('preprocessing', {}).get('target_fps', 3.0)
             
             if duration and duration > 0:
                 # Calculate based on ACTUAL duration, not 3 minutes!
@@ -294,6 +306,7 @@ def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_i
         
         try:
             print("  🔄 Extracting frames uniformly...")
+            max_image_size = colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)
             frame_paths = extract_frames_uniformly(
                 video_path=video_file,
                 output_dir=temp_dir,
@@ -326,7 +339,7 @@ def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_i
     
     # Run COLMAP reconstruction
     print("🏗️  Running COLMAP reconstruction...")
-    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_config)
+    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
     
     print(f"🎉 COLMAP processing complete!")
     return output_path
@@ -468,18 +481,6 @@ def parse_arguments():
         help="Directory to save EDGS training results.",
     )
     parser.add_argument(
-        "--target_fps",
-        type=float,
-        default=3.0,
-        help="Target frames per second for video extraction (default: 3.0)",
-    )
-    parser.add_argument(
-        "--max_image_size",
-        type=int,
-        default=-1,
-        help="Maximum image dimension. -1 keeps original resolution.",
-    )
-    parser.add_argument(
         "--colmap_config",
         type=str,
         default="low_memory",
@@ -489,12 +490,21 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def prepare_scene_directory(args):
+def load_colmap_config(config_name):
+    """Load COLMAP configuration from file."""
+    config_path = os.path.join(project_root, "configs", f"colmap_{config_name}.yaml")
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    config['config_name'] = config_name  # Store the config name
+    return config
+
+def prepare_scene_directory(args, colmap_cfg):
     """
     Prepare the COLMAP scene directory, either using existing or creating new.
     
     Args:
         args: Command line arguments
+        colmap_cfg: COLMAP configuration dictionary
         
     Returns:
         scene_dir: Path to COLMAP scene directory
@@ -521,8 +531,7 @@ def prepare_scene_directory(args):
             scene_dir = process_images_to_colmap_scene(
                 image_dir=args.input,
                 output_path=os.path.join(base_output_path, "image_scene"),
-                max_image_size=args.max_image_size,
-                colmap_config=args.colmap_config
+                colmap_cfg=colmap_cfg
             )
             return scene_dir
         
@@ -533,9 +542,7 @@ def prepare_scene_directory(args):
             scene_dir = process_video_to_colmap_scene(
                 video_path=args.input,
                 output_path=os.path.join(base_output_path, "video_scene"),
-                target_fps=args.target_fps,
-                max_image_size=args.max_image_size,
-                colmap_config=args.colmap_config
+                colmap_cfg=colmap_cfg
             )
             return scene_dir
         
@@ -550,15 +557,14 @@ def prepare_scene_directory(args):
         scene_dir = process_video_to_colmap_scene(
             video_path=args.input,
             output_path=os.path.join(base_output_path, "video_scene"),
-            target_fps=args.target_fps,
-            max_image_size=args.max_image_size,
-            colmap_config=args.colmap_config
+            colmap_cfg=colmap_cfg
         )
         return scene_dir
 
 
-def configure_resolution(cfg, max_image_size):
-    """Configure the resolution parameter based on max_image_size."""
+def configure_resolution(cfg, colmap_cfg):
+    """Configure the resolution parameter based on max_image_size from colmap config."""
+    max_image_size = colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)
     if max_image_size <= 0:
         return
     
@@ -583,17 +589,23 @@ def main():
     # Parse arguments
     args = parse_arguments()
     
+    # Load COLMAP configuration
+    colmap_cfg = load_colmap_config(args.colmap_config)
+    print(f"\n📋 Using COLMAP config: {args.colmap_config}")
+    print(f"  - Target FPS: {colmap_cfg.get('preprocessing', {}).get('target_fps', 3.0)}")
+    print(f"  - Max image size: {colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)}")
+    
     # Initialize Hydra configuration
     with initialize(config_path="../configs", version_base="1.1"):
         cfg = compose(config_name=args.config)
-        print(f"\n📋 Using config: {args.config}")
+        print(f"\n📋 Using training config: {args.config}")
         
         # Check if using memory-optimized config
         if any(x in args.config for x in ["_04_", "_05_", "_06_", "medium", "low"]):
             print("💾 Memory-optimized mode enabled")
     
     # Prepare COLMAP scene
-    scene_dir = prepare_scene_directory(args)
+    scene_dir = prepare_scene_directory(args, colmap_cfg)
     
     # Set up paths for EDGS
     cfg.gs.dataset.source_path = scene_dir
@@ -608,15 +620,15 @@ def main():
     print(f"📦 EDGS output: {model_path}")
     os.makedirs(model_path, exist_ok=True)
     
-    # Copy config file for reference
-    copy_config_to_output(args.config, model_path)
+    # Save both config files for reference
+    save_configs_to_output(args.config, args.colmap_config, model_path)
     
     # Initialize WandB
     initialize_wandb(cfg)
     omegaconf.OmegaConf.resolve(cfg)
     
     # Configure resolution
-    configure_resolution(cfg, args.max_image_size)
+    configure_resolution(cfg, colmap_cfg)
     
     # Set random seed
     set_seed(cfg.seed)

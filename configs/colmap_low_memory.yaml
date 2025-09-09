@@ -2,6 +2,11 @@
 # Optimized for memory-constrained systems
 # Recommended for: Large datasets, GPUs with 6-8GB memory
 
+# Video/Image preprocessing settings
+preprocessing:
+  target_fps: 2.0              # Lower frame rate for memory efficiency
+  max_image_size: 1024         # Reduced image size for lower memory usage
+
 sift_extraction:
   max_num_features: 4096       # Reduced feature count to save memory
   max_image_size: 1920         # Lower resolution to reduce memory usage

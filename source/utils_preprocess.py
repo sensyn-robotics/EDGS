@@ -622,18 +622,22 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="balanced")
     Args:
         scene_dir (str): Path to scene directory containing 'images' folder.
         force_pinhole (bool): If True, forces PINHOLE camera model during reconstruction.
-        colmap_config (str): COLMAP configuration profile to use. Options:
-            - 'high_accuracy': Best quality, high memory usage
-            - 'balanced': Good quality, moderate memory usage (default)
-            - 'low_memory': Reduced quality, low memory usage  
-            - 'very_low_memory': Minimal quality, very low memory usage
+        colmap_config: Either a string config name or a dictionary with config settings.
+            If string, options are: 'high_accuracy', 'balanced', 'low_memory', 'very_low_memory'
+            If dict, should contain the full configuration.
     """
     start_time = time.time()
     print(f"Running COLMAP pipeline on all images inside {scene_dir}")
-    print(f"Using COLMAP configuration profile: {colmap_config}")
-
-    # Load configuration
-    config = load_colmap_config(colmap_config)
+    
+    # Load configuration - handle both string names and dict configs
+    if isinstance(colmap_config, str):
+        print(f"Using COLMAP configuration profile: {colmap_config}")
+        config = load_colmap_config(colmap_config)
+    else:
+        # Already a config dictionary
+        config_name = colmap_config.get('config_name', 'custom')
+        print(f"Using COLMAP configuration: {config_name}")
+        config = colmap_config
 
     # Setup paths
     database_path = os.path.join(scene_dir, "database.db")

@@ -2,6 +2,11 @@
 # Best quality reconstruction, higher memory usage
 # Recommended for: Small to medium datasets, high-end GPUs (16GB+)
 
+# Video/Image preprocessing settings
+preprocessing:
+  target_fps: 3.0              # Frame extraction rate for videos
+  max_image_size: -1           # Keep original resolution for highest quality
+
 sift_extraction:
   max_num_features: 16384      # Very high feature count for best quality
   max_image_size: 3200         # High resolution processing

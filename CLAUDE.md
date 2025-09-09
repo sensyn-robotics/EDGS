@@ -57,11 +57,17 @@ python script/train.py \
 python script/fit_model_to_scene_full.py --input <video.mp4> --output_path <output_dir>
 
 # With memory optimization (for low GPU memory)
-python script/fit_model_to_scene_full.py --input <video.mp4> --config train_low_memory
+python script/fit_model_to_scene_full.py --input <video.mp4> --config train_low_memory --colmap_config low_memory
 
-# With specific COLMAP settings
-python script/fit_model_to_scene_full.py --input <video.mp4> --colmap_config low_memory
+# High quality processing
+python script/fit_model_to_scene_full.py --input <video.mp4> --config train_02_high_quality --colmap_config high_accuracy
 ```
+
+**Note:** Video preprocessing settings (target_fps, max_image_size) are now part of the COLMAP config:
+- `high_accuracy`: target_fps=3.0, max_image_size=-1 (original)
+- `balanced`: target_fps=3.0, max_image_size=1920
+- `low_memory`: target_fps=2.0, max_image_size=1024
+- `very_low_memory`: target_fps=1.0, max_image_size=800
 
 ### Running Interactive Tools
 
@@ -156,10 +162,10 @@ python script/full_eval.py -m360 <mipnerf360_folder> -tat <tanks_temples_folder>
 - `init_wC.num_refs`: Number of reference views for initialization
 - `train.no_densify`: Always True for EDGS (disables densification)
 
-**Video processing parameters:**
-- `--target_fps`: Frame extraction rate (default: 3.0)
-- `--max_image_size`: Maximum image dimension for resizing (-1 for original)
+**Configuration parameters:**
 - `--colmap_config`: COLMAP quality profile (high_accuracy/balanced/low_memory/very_low_memory)
+  - Includes video preprocessing settings (target_fps, max_image_size)
+- `--config`: Training configuration profile
 
 ## Data Paths
 

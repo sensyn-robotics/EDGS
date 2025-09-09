@@ -2,6 +2,11 @@
 # Good quality with moderate memory usage
 # Recommended for: Most use cases, mid-range GPUs (8-12GB)
 
+# Video/Image preprocessing settings
+preprocessing:
+  target_fps: 3.0              # Frame extraction rate for videos
+  max_image_size: 1920         # Maximum image dimension (-1 for original)
+
 sift_extraction:
   max_num_features: 8192       # Balanced feature count
   max_image_size: 2048         # Moderate resolution
