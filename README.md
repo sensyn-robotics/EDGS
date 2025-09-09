@@ -102,15 +102,15 @@ docker compose exec edgs-app python script/fit_model_to_scene_full.py \
     --colmap_config <colmap_preset>       # COLMAP preset (01=highest to 06=lowest quality) \
     --config <config_name>                # Training config (01=highest to 06=lowest quality) \
     --output_path <output_dir>            # Where to save EDGS model (optional)
-
-# COLMAP configs (include video preprocessing settings):
-#   - colmap_01_highest_quality: target_fps=3.0, max_image_size=-1 (original)
-#   - colmap_02_high_quality: target_fps=3.0, max_image_size=2560
-#   - colmap_03_optimal_quality: target_fps=3.0, max_image_size=1920 (default)
-#   - colmap_04_medium_quality: target_fps=2.5, max_image_size=1600
-#   - colmap_05_low_quality: target_fps=2.0, max_image_size=1024
-#   - colmap_06_lowest_quality: target_fps=1.0, max_image_size=800
 ```
+
+**Available COLMAP configs (include video preprocessing settings):**
+- `colmap_01_highest_quality`: target_fps=3.0, max_image_size=-1 (original resolution)
+- `colmap_02_high_quality`: target_fps=3.0, max_image_size=2560
+- `colmap_03_optimal_quality`: target_fps=3.0, max_image_size=1920 (default)
+- `colmap_04_medium_quality`: target_fps=2.5, max_image_size=1600
+- `colmap_05_low_quality`: target_fps=2.0, max_image_size=1024
+- `colmap_06_lowest_quality`: target_fps=1.0, max_image_size=800
 
 **Available training configs by GPU memory:**
 - `train_01_highest_quality` (16GB+)
