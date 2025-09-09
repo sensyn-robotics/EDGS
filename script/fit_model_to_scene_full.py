@@ -198,6 +198,9 @@ def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
     
     print(f"📊 Found {len(image_paths)} images")
     
+    # Get preprocessing settings from colmap config
+    max_image_size = colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)
+    
     # Create output directory
     os.makedirs(output_path, exist_ok=True)
     images_dir = os.path.join(output_path, "images")
@@ -236,16 +239,14 @@ def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
     return output_path
 
 
-def process_video_to_colmap_scene(video_path, output_path, target_fps=3.0, max_image_size=1024, colmap_config="very_low_memory"):
+def process_video_to_colmap_scene(video_path, output_path, colmap_cfg):
     """
     Process video(s) with uniform frame extraction and run COLMAP.
     
     Args:
         video_path: Path to video file or directory
         output_path: Directory to save COLMAP scene
-        target_fps: Target frames per second for extraction
-        max_image_size: Maximum dimension for frames
-        colmap_config: COLMAP configuration preset
+        colmap_cfg: COLMAP configuration dictionary with preprocessing settings
         
     Returns:
         scene_dir: Path to COLMAP scene directory
