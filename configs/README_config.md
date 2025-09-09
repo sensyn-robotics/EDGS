@@ -98,42 +98,42 @@ The configurations are ranked from **highest to lowest quality/accuracy**:
 ```bash
 # Highest quality (requires 16GB+ GPU) - Best possible results
 python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_scene \
+    --input <video.mp4 or image_dir> \
     --output_path outputs/my_scene_highest \
     --config train_01_highest_quality \
     --max_image_size 1920
 
 # High quality (requires 12-16GB GPU) - Extended training
 python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_scene \
+    --input <video.mp4 or image_dir> \
     --output_path outputs/my_scene_high \
     --config train_02_high_quality \
     --max_image_size 800
 
 # Optimal quality (requires 12-16GB GPU) - Balanced approach
 python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_scene \
+    --input <video.mp4 or image_dir> \
     --output_path outputs/my_scene_optimal \
     --config train_03_optimal_quality \
     --max_image_size 1600
 
 # Medium quality (8-12GB GPU) - Good compromise
 python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_scene \
+    --input <video.mp4 or image_dir> \
     --output_path outputs/my_scene_medium \
     --config train_04_medium_quality \
     --max_image_size 1024
 
 # Low quality (8-12GB GPU) - Memory safe, long training
 python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_scene \
+    --input <video.mp4 or image_dir> \
     --output_path outputs/my_scene_low \
     --config train_05_low_quality \
     --max_image_size 512
 
 # Lowest quality (4-8GB GPU) - Emergency settings
 python script/fit_model_to_scene_full.py \
-    --colmap_output_path outputs/my_scene \
+    --input <video.mp4 or image_dir> \
     --output_path outputs/my_scene_lowest \
     --config train_06_lowest_quality \
     --max_image_size 256

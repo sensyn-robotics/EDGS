@@ -54,13 +54,13 @@ python script/train.py \
 **Process video to 3D model (full pipeline):**
 ```bash
 # Standard processing
-python script/fit_model_to_scene_full.py --video_path <video.mp4> --output_path <output_dir>
+python script/fit_model_to_scene_full.py --input <video.mp4> --output_path <output_dir>
 
 # With memory optimization (for low GPU memory)
-python script/fit_model_to_scene_full.py --video_path <video.mp4> --config train_low_memory
+python script/fit_model_to_scene_full.py --input <video.mp4> --config train_low_memory
 
 # With specific COLMAP settings
-python script/fit_model_to_scene_full.py --video_path <video.mp4> --colmap_config low_memory
+python script/fit_model_to_scene_full.py --input <video.mp4> --colmap_config low_memory
 ```
 
 ### Running Interactive Tools

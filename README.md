@@ -98,10 +98,9 @@ python script/gradio_demo.py --port 7862
 From command line - Complete command with all possible arguments:
 ```bash
 docker compose exec edgs-app python script/fit_model_to_scene_full.py \
-    --video_path <input.mp4>              # Path to video file or directory with videos \
-    --colmap_output_path <colmap_dir>     # COLMAP scene path (optional, reuses if exists) \
+    --input <input>                       # Path to input: COLMAP scene, image directory, video directory, or video file \
     --target_fps <fps>                    # Frame extraction rate (default: 3.0) \
-    --max_image_size <pixels>             # Maximum image dimension (width or height). Images larger than this will be resized while preserving aspect ratio. For example, a 4K image (3840x2160) with max_image_size=1920 becomes 1920x1080. Use -1 to keep original resolution. Default: -1 (default: -1) \
+    --max_image_size <pixels>             # Maximum image dimension (width or height). Images larger than this will be resized while preserving aspect ratio. For example, a 4K image (3840x2160) with max_image_size=1920 becomes 1920x1080. Use -1 to keep original resolution. Default: -1 \
     --colmap_config <colmap_preset>       # COLMAP preset: high_accuracy/balanced/low_memory/very_low_memory \
     --config <config_name>                # Training config (see options below) \
     --output_path <output_dir>            # Where to save EDGS model (optional)
@@ -118,14 +117,14 @@ docker compose exec edgs-app python script/fit_model_to_scene_full.py \
 **Quick examples:**
 ```bash
 # Simple usage
-python script/fit_model_to_scene_full.py --video_path video.mp4
+python script/fit_model_to_scene_full.py --input video.mp4
 
 # Low memory system
-python script/fit_model_to_scene_full.py --video_path video.mp4 \
+python script/fit_model_to_scene_full.py --input video.mp4 \
     --config train_06_lowest_quality --colmap_config very_low_memory
 
 # High quality with custom settings
-python script/fit_model_to_scene_full.py --video_path video.mp4 \
+python script/fit_model_to_scene_full.py --input video.mp4 \
     --config train_02_high_quality --target_fps 5.0 --max_image_size 1920
 ```
 
