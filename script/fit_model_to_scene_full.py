@@ -162,8 +162,10 @@ def save_configs_to_output(train_config_name, colmap_config_name, model_path):
         else:
             print(f"⚠️ Training config file not found: {train_config_path}")
         
-        # Save colmap config
-        colmap_config_file = f"../configs/colmap_{colmap_config_name}.yaml"
+        # Save colmap config - handle both old and new naming
+        if not colmap_config_name.startswith("colmap_"):
+            colmap_config_name = f"colmap_{colmap_config_name}"
+        colmap_config_file = f"../configs/{colmap_config_name}.yaml"
         colmap_config_path = os.path.join(os.path.dirname(__file__), colmap_config_file)
         if os.path.exists(colmap_config_path):
             dst = os.path.join(model_path, "colmap_config.yaml")
@@ -483,16 +485,21 @@ def parse_arguments():
     parser.add_argument(
         "--colmap_config",
         type=str,
-        default="low_memory",
-        choices=["high_accuracy", "balanced", "low_memory", "very_low_memory"],
-        help="COLMAP configuration profile.",
+        default="colmap_03_optimal_quality",
+        choices=["colmap_01_highest_quality", "colmap_02_high_quality", "colmap_03_optimal_quality", 
+                 "colmap_04_medium_quality", "colmap_05_low_quality", "colmap_06_lowest_quality"],
+        help="COLMAP configuration profile (01=highest to 06=lowest quality).",
     )
     return parser.parse_args()
 
 
 def load_colmap_config(config_name):
     """Load COLMAP configuration from file."""
-    config_path = os.path.join(project_root, "configs", f"colmap_{config_name}.yaml")
+    # Handle both old and new naming conventions
+    if not config_name.startswith("colmap_"):
+        config_name = f"colmap_{config_name}"
+    
+    config_path = os.path.join(project_root, "configs", f"{config_name}.yaml")
     with open(config_path, 'r') as f:
         config = yaml.safe_load(f)
     config['config_name'] = config_name  # Store the config name

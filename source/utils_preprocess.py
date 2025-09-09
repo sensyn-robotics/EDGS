@@ -14,27 +14,34 @@ from PIL import Image
 from tqdm import tqdm
 
 
-def load_colmap_config(config_name="balanced"):
+def load_colmap_config(config_name="colmap_03_optimal_quality"):
     """
     Load COLMAP configuration from YAML file.
     
     Args:
         config_name (str): Configuration profile name. Options:
-            - 'high_accuracy': Best quality, high memory usage
-            - 'balanced': Good quality, moderate memory usage (default)
-            - 'low_memory': Reduced quality, low memory usage
-            - 'very_low_memory': Minimal quality, very low memory usage
+            - 'colmap_01_highest_quality': Best quality, highest memory usage
+            - 'colmap_02_high_quality': High quality, good memory efficiency  
+            - 'colmap_03_optimal_quality': Balanced quality and memory (default)
+            - 'colmap_04_medium_quality': Good quality, memory efficient
+            - 'colmap_05_low_quality': Reduced quality, low memory usage
+            - 'colmap_06_lowest_quality': Minimal quality, very low memory usage
     
     Returns:
         dict: Configuration dictionary with SIFT and mapping parameters
     """
     # Get the project root directory (assuming this file is in source/)
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    config_file = os.path.join(project_root, "configs", f"colmap_{config_name}.yaml")
+    
+    # Handle both old naming (without colmap_ prefix) and new naming
+    if not config_name.startswith("colmap_"):
+        config_name = f"colmap_{config_name}"
+    
+    config_file = os.path.join(project_root, "configs", f"{config_name}.yaml")
     
     if not os.path.exists(config_file):
-        print(f"Warning: Config file {config_file} not found, using balanced profile")
-        config_file = os.path.join(project_root, "configs", "colmap_balanced.yaml")
+        print(f"Warning: Config file {config_file} not found, using optimal quality profile")
+        config_file = os.path.join(project_root, "configs", "colmap_03_optimal_quality.yaml")
     
     try:
         with open(config_file, 'r') as f:
@@ -614,7 +621,7 @@ def create_fallback_reconstruction(image_dir, sparse_path):
     print("⚠️  Note: This is a basic reconstruction with assumed camera positions. Results may be limited.")
 
 
-def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="balanced"):
+def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_optimal_quality"):
     """
     Runs feature extraction, matching, and mapping on all images inside scene_dir/images using pycolmap.
     Forces PINHOLE camera model to avoid distortion issues.

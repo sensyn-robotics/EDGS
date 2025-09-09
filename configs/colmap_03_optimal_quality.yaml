@@ -1,6 +1,6 @@
-# COLMAP Configuration: Balanced
-# Good quality with moderate memory usage
-# Recommended for: Most use cases, mid-range GPUs (8-12GB)
+# COLMAP Configuration: 03 - Optimal Quality  
+# Balanced quality with moderate memory usage
+# Recommended for: Most use cases, mid-range GPUs (10-12GB)
 
 # Video/Image preprocessing settings
 preprocessing:

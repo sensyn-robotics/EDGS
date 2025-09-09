@@ -1,6 +1,6 @@
-# COLMAP Configuration: Very Low Memory
+# COLMAP Configuration: 06 - Lowest Quality
 # Minimal memory usage for severely constrained systems
-# Recommended for: Very large datasets, GPUs with 4-6GB memory, high-resolution inputs
+# Recommended for: GPUs with 4-6GB memory, emergency/preview processing
 
 # Video/Image preprocessing settings
 preprocessing:

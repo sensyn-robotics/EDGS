@@ -57,17 +57,19 @@ python script/train.py \
 python script/fit_model_to_scene_full.py --input <video.mp4> --output_path <output_dir>
 
 # With memory optimization (for low GPU memory)
-python script/fit_model_to_scene_full.py --input <video.mp4> --config train_low_memory --colmap_config low_memory
+python script/fit_model_to_scene_full.py --input <video.mp4> --config train_05_low_quality --colmap_config colmap_05_low_quality
 
 # High quality processing
-python script/fit_model_to_scene_full.py --input <video.mp4> --config train_02_high_quality --colmap_config high_accuracy
+python script/fit_model_to_scene_full.py --input <video.mp4> --config train_02_high_quality --colmap_config colmap_02_high_quality
 ```
 
-**Note:** Video preprocessing settings (target_fps, max_image_size) are now part of the COLMAP config:
-- `high_accuracy`: target_fps=3.0, max_image_size=-1 (original)
-- `balanced`: target_fps=3.0, max_image_size=1920
-- `low_memory`: target_fps=2.0, max_image_size=1024
-- `very_low_memory`: target_fps=1.0, max_image_size=800
+**COLMAP Configs (include video preprocessing):**
+- `colmap_01_highest_quality`: target_fps=3.0, max_image_size=-1 (original)
+- `colmap_02_high_quality`: target_fps=3.0, max_image_size=2560
+- `colmap_03_optimal_quality`: target_fps=3.0, max_image_size=1920 (default)
+- `colmap_04_medium_quality`: target_fps=2.5, max_image_size=1600
+- `colmap_05_low_quality`: target_fps=2.0, max_image_size=1024
+- `colmap_06_lowest_quality`: target_fps=1.0, max_image_size=800
 
 ### Running Interactive Tools
 
@@ -163,9 +165,9 @@ python script/full_eval.py -m360 <mipnerf360_folder> -tat <tanks_temples_folder>
 - `train.no_densify`: Always True for EDGS (disables densification)
 
 **Configuration parameters:**
-- `--colmap_config`: COLMAP quality profile (high_accuracy/balanced/low_memory/very_low_memory)
+- `--colmap_config`: COLMAP quality profile (01=highest to 06=lowest quality)
   - Includes video preprocessing settings (target_fps, max_image_size)
-- `--config`: Training configuration profile
+- `--config`: Training configuration profile (01=highest to 06=lowest quality)
 
 ## Data Paths
 

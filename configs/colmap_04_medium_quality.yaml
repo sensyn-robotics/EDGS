@@ -1,0 +1,45 @@
+# COLMAP Configuration: 04 - Medium Quality
+# Good quality with memory efficiency
+# Recommended for: GPUs with 8-10GB, good balance of speed and quality
+
+# Video/Image preprocessing settings
+preprocessing:
+  target_fps: 2.5              # Moderate frame rate
+  max_image_size: 1600         # Medium resolution
+
+sift_extraction:
+  max_num_features: 6144       # Moderate feature count
+  max_image_size: 1600         # Medium resolution
+  first_octave: 0              # Skip super-resolution for memory
+  num_octaves: 4
+  octave_resolution: 3
+  peak_threshold: 0.006        # Moderate sensitivity
+  edge_threshold: 12           # Slightly more edge filtering
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  max_ratio: 0.82              # Slightly more lenient
+  max_distance: 0.78
+  cross_check: true
+  max_num_matches: 12288       # Moderate matches
+
+pipeline:
+  min_num_matches: 5
+  multiple_models: false
+  max_num_models: 1
+  max_model_overlap: 100
+  min_model_size: 40           # Allow slightly smaller models
+  extract_colors: true
+  num_threads: 6               # Limit threads for memory
+
+mapper:
+  init_min_num_inliers: 14
+  init_max_error: 7.0
+  init_min_tri_angle: 1.8
+  abs_pose_min_num_inliers: 14
+  abs_pose_max_error: 11.0
+  abs_pose_min_inlier_ratio: 0.15
+  filter_max_reproj_error: 7.0
+  filter_min_tri_angle: 0.4

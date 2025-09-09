@@ -1,19 +1,19 @@
-# COLMAP Configuration: High Accuracy
-# Best quality reconstruction, higher memory usage
-# Recommended for: Small to medium datasets, high-end GPUs (16GB+)
+# COLMAP Configuration: 02 - High Quality
+# High quality reconstruction with good memory efficiency
+# Recommended for: GPUs with 12-16GB, excellent quality with reasonable speed
 
 # Video/Image preprocessing settings
 preprocessing:
   target_fps: 3.0              # Frame extraction rate for videos
-  max_image_size: -1           # Keep original resolution for highest quality
+  max_image_size: 2560         # 2.5K resolution for high quality
 
 sift_extraction:
-  max_num_features: 16384      # Very high feature count for best quality
-  max_image_size: 3200         # High resolution processing
-  first_octave: -1             # Include super-resolution features for detail
+  max_num_features: 12288      # High feature count for quality
+  max_image_size: 2560         # High resolution processing
+  first_octave: -1             # Include super-resolution features
   num_octaves: 4               # Full octave range
   octave_resolution: 3
-  peak_threshold: 0.001        # Very sensitive feature detection
+  peak_threshold: 0.002        # Sensitive feature detection
   edge_threshold: 10           # Standard edge filtering
   estimate_affine_shape: false
   domain_size_pooling: false
@@ -21,9 +21,9 @@ sift_extraction:
 
 sift_matching:
   max_ratio: 0.8               # Strict ratio test
-  max_distance: 0.7            # Strict distance threshold
+  max_distance: 0.75           # Moderately strict distance threshold
   cross_check: true
-  max_num_matches: 32768       # Allow many matches
+  max_num_matches: 24576       # Allow many matches
 
 pipeline:
   min_num_matches: 5           # Low threshold for connections
@@ -36,10 +36,10 @@ pipeline:
 
 mapper:
   init_min_num_inliers: 15
-  init_max_error: 4.0          # Strict error tolerance
+  init_max_error: 5.0          # Moderately strict error tolerance
   init_min_tri_angle: 2.0
   abs_pose_min_num_inliers: 15
-  abs_pose_max_error: 8.0
+  abs_pose_max_error: 9.0
   abs_pose_min_inlier_ratio: 0.15
-  filter_max_reproj_error: 4.0  # Strict filtering
+  filter_max_reproj_error: 5.0  # Moderately strict filtering
   filter_min_tri_angle: 0.5

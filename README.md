@@ -99,15 +99,17 @@ From command line - Complete command with all possible arguments:
 ```bash
 docker compose exec edgs-app python script/fit_model_to_scene_full.py \
     --input <input>                       # Path to input: COLMAP scene, image directory, video directory, or video file \
-    --colmap_config <colmap_preset>       # COLMAP preset: high_accuracy/balanced/low_memory/very_low_memory \
-    --config <config_name>                # Training config (see options below) \
+    --colmap_config <colmap_preset>       # COLMAP preset (01=highest to 06=lowest quality) \
+    --config <config_name>                # Training config (01=highest to 06=lowest quality) \
     --output_path <output_dir>            # Where to save EDGS model (optional)
 
-# Note: Video preprocessing settings (target_fps, max_image_size) are now configured in the COLMAP config files:
-#   - high_accuracy: target_fps=3.0, max_image_size=-1 (original resolution)
-#   - balanced: target_fps=3.0, max_image_size=1920
-#   - low_memory: target_fps=2.0, max_image_size=1024
-#   - very_low_memory: target_fps=1.0, max_image_size=800
+# COLMAP configs (include video preprocessing settings):
+#   - colmap_01_highest_quality: target_fps=3.0, max_image_size=-1 (original)
+#   - colmap_02_high_quality: target_fps=3.0, max_image_size=2560
+#   - colmap_03_optimal_quality: target_fps=3.0, max_image_size=1920 (default)
+#   - colmap_04_medium_quality: target_fps=2.5, max_image_size=1600
+#   - colmap_05_low_quality: target_fps=2.0, max_image_size=1024
+#   - colmap_06_lowest_quality: target_fps=1.0, max_image_size=800
 ```
 
 **Available training configs by GPU memory:**
@@ -125,11 +127,11 @@ python script/fit_model_to_scene_full.py --input video.mp4
 
 # Low memory system
 python script/fit_model_to_scene_full.py --input video.mp4 \
-    --config train_06_lowest_quality --colmap_config very_low_memory
+    --config train_06_lowest_quality --colmap_config colmap_06_lowest_quality
 
 # High quality
 python script/fit_model_to_scene_full.py --input video.mp4 \
-    --config train_02_high_quality --colmap_config high_accuracy
+    --config train_02_high_quality --colmap_config colmap_02_high_quality
 ```
 
 #### Option C
