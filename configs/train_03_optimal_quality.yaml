@@ -8,7 +8,7 @@ defaults:
 
 # EDGS core settings
 train:
-  no_densify: True  # EDGS principle
+  no_densify: False  # Enable densification for optimal quality
   gs_epochs: 60000  # Full training iterations
   reduce_opacity: True
   max_lr: True
