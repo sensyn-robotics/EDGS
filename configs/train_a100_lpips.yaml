@@ -1,0 +1,84 @@
+# A100-optimized configuration for EDGS targeting LPIPS < 0.2
+# Maximizes quality with A100's 40-80GB memory capacity
+# Target: LPIPS < 0.2, PSNR > 25
+
+defaults:
+  - train
+  - _self_
+
+# Training parameters optimized for A100 and LPIPS < 0.2
+train:
+  no_densify: False # Enable densification for maximum quality
+  gs_epochs: 200000 # Extended training for convergence to LPIPS < 0.2
+  reduce_opacity: True
+  max_lr: True
+
+# Dataset paths for closeup flight colmap output
+gs:
+  dataset:
+    source_path: "outputs/output_closeup_flight_all/colmap_output_closeup_all/"
+    model_path: "outputs/output_closeup_flight_all/edgs_a100_lpips/"
+
+  sh_degree: 3 # Maximum spherical harmonics for best quality
+
+  opt:
+    # A100 can handle larger batches - improves convergence
+    batch_size: 16 # Increased batch size for A100 memory capacity
+
+    # Progressive densification for quality
+    densify_from_iter: 10000 # Start early for comprehensive coverage
+    densify_until_iter: 100000 # Extended densification period
+    densify_grad_threshold: 0.0002 # More sensitive threshold for detail
+    percent_dense: 0.002 # Higher density for quality
+    densification_interval: 500 # More frequent densification
+
+    # Regular cleanup for optimal Gaussian distribution
+    opacity_reset_interval: 2000
+
+    # Fine-tuned learning rates for LPIPS optimization
+    position_lr_init: 0.00024 # Balanced initial rate
+    position_lr_final: 0.00000008 # Very low final for refinement
+    position_lr_delay_mult: 0.008
+    position_lr_max_steps: 150000 # Extended schedule
+
+    # Optimized learning rates for detail preservation
+    feature_lr: 0.0035 # Higher for better feature learning
+    opacity_lr: 0.05 # Moderate opacity updates
+    scaling_lr: 0.0035 # Balanced scaling
+    rotation_lr: 0.0015 # Careful rotation updates
+
+    # Loss weighting optimized for LPIPS
+    lambda_dssim: 0.25 # Balanced SSIM weight for perceptual quality
+
+    # Comprehensive checkpoints for evaluation
+    save_iterations:
+      [10000, 25000, 50000, 75000, 100000, 125000, 150000, 175000, 200000]
+
+    # Exposure compensation for consistent lighting
+    exposure_lr_init: 0.015
+    exposure_lr_final: 0.00005
+    exposure_lr_delay_steps: 20000
+    exposure_lr_max_steps: 150000
+
+# EDGS initialization - maximizing quality for A100
+init_wC:
+  use: True # Enable EDGS correlation-based initialization
+  matches_per_ref: 50000 # Maximum matches for A100 memory
+  num_refs: 800 # Extensive reference views for coverage
+  nns_per_ref: 15 # More neighbors for dense initialization
+  scaling_factor: 0.0008 # Balanced initial Gaussian size
+  proj_err_tolerance: 0.005 # Tighter tolerance for accuracy
+  roma_model: "outdoors" # Outdoor model for aerial scenes
+  add_SfM_init: True # Include SfM for comprehensive init
+
+  # Additional quality parameters
+  min_track_length: 3 # Minimum track length for stability
+  max_reprojection_error: 2.0 # Pixel threshold for outliers
+  min_triangulation_angle: 1.0 # Degrees for robust triangulation
+
+# A100-specific memory management
+memory:
+  gradient_accumulation_steps: 1 # No accumulation needed with A100
+  mixed_precision: False # Full precision for quality
+  cache_images: True # Cache all images in memory
+  preload_gpu: True # Preload data to GPU

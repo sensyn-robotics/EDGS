@@ -85,7 +85,7 @@ You have two options for data management:
 
 #### 3.2.2 Register data on Azure ML Studio:
 
-1. Go to Azure ML Studio
+1. Go to Azure ML Studio target workspace.
 2. Navigate to "Data" section
 3. Click "Create dataset" → "From datastore"
 4. Select your uploaded data location

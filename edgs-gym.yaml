@@ -1,11 +1,11 @@
 experiment_name: "edgs"
 workspace: "power-grid-check-dev-ml"
-environment: 
+environment:
   name: "sensynmldev.azurecr.io/edgs-app"
   version: "latest"
 compute: "NC24ads-A100"
-command: "python script/fit_model_to_scene_full.py --config train_01_highest_quality --output_path outputs/tower_S1000275"
+command: "python script/fit_model_to_scene_full.py --config train_a100_lpips --output_path outputs/"
 data: # optional
-  input: "tower_closeup_flight275"  # This must match your registered Azure ML data asset name
+  input: "colmap_output_closeup_all" # This must match your registered Azure ML data asset name
 metadata: # optional
   task: "gaussian_splatting"

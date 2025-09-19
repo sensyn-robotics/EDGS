@@ -4,7 +4,7 @@
 """
 EDGS: Eliminating Densification for Gaussian Splatting
 
-EDGS improves 3D Gaussian Splatting by removing the need for densification. 
+EDGS improves 3D Gaussian Splatting by removing the need for densification.
 It starts from a dense point cloud initialization based on 2D correspondences, leading to:
 - ⚡ Faster convergence (only 25% of training time)
 - 🌀 Higher rendering quality
@@ -26,6 +26,22 @@ import subprocess
 import yaml
 from pathlib import Path
 
+# Add the project root directory to sys.path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+# Check and fix CUDA errors before importing torch
+cuda_fix_script = os.path.join(project_root, "script", "cuda_error_fix.py")
+if os.path.exists(cuda_fix_script):
+    try:
+        # Run CUDA fix if needed
+        result = subprocess.run([sys.executable, cuda_fix_script], capture_output=True, text=True)
+        if result.returncode != 0:
+            print("⚠️  Warning: CUDA initialization issue detected. Running in CPU mode.")
+    except Exception as e:
+        print(f"⚠️  Could not run CUDA check: {e}")
+
 import cv2
 import hydra
 import numpy as np
@@ -35,11 +51,6 @@ import wandb
 from hydra import compose, initialize
 from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
-
-# Add the project root directory to sys.path
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
 
 from source.trainer import EDGSTrainer
 from source.utils_aux import set_seed
