@@ -87,9 +87,9 @@ You have two options for data management:
 
 1. Go to Azure ML Studio target workspace.
 2. Navigate to "Data" section
-3. Click "Create dataset" → "From datastore"
-4. Select your uploaded data location
-5. Name your dataset (e.g., "otowa360")
+3. Click "+Create" -> name the dataset
+4. Name your dataset (e.g., "otowa360")
+5. "From Azure storage" -> Select your uploaded data location
 6. Register the dataset
 
 ## Step 4: Configure sensyn-gym YAML
@@ -105,7 +105,7 @@ workspace: "power-grid-check-dev-ml"  # Your Azure ML workspace name
 environment: 
   name: "sensynmldev.azurecr.io/edgs-app"  # Your ACR image path
   version: "latest"
-compute: "NC24ads-A100"  # Your GPU compute cluster name
+compute: "lambda-cluster"  # Your GPU compute cluster name
 command: "python script/fit_model_to_scene_full.py --config train_02_high_quality --output_path outputs/experiment_name"
 data:  # optional - use for Azure ML datasets
   video_path: "otowa360"  # Your Azure ML dataset name
@@ -123,7 +123,7 @@ metadata:  # optional
   - `version`: Image tag (usually "latest")
 - **compute**: Name of your GPU compute cluster
   - Must have managed identity for ACR access
-  - Recommended: NC24ads-A100 or similar GPU instances
+  - Recommended: lambda-cluster orNC24ads-A100 or similar GPU instances
 - **command**: The training command to execute
 - **data**: Maps to Azure ML datasets
   - Key names (e.g., `video_path`) become environment variables
