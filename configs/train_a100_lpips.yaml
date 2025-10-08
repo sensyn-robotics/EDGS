@@ -15,9 +15,9 @@ train:
 
 # Dataset paths for closeup flight colmap output
 gs:
-  dataset:
-    source_path: "outputs/output_closeup_flight_all/colmap_output_closeup_all/"
-    model_path: "outputs/output_closeup_flight_all/edgs_a100_lpips/"
+  # dataset:
+  #   source_path: "outputs/output_closeup_flight_all/colmap_output_closeup_all/"
+  #   model_path: "outputs/output_closeup_flight_all/edgs_a100_lpips/"
 
   sh_degree: 3 # Maximum spherical harmonics for best quality
 
