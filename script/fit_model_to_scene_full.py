@@ -56,6 +56,7 @@ from source.trainer import EDGSTrainer
 from source.utils_aux import set_seed
 from source.utils_preprocess import run_colmap_on_scene
 from script.extract_frames_uniform import extract_frames_uniformly, get_video_duration_safe
+from script.undistort_colmap_scene import needs_undistortion, undistort_colmap_scene
 
 # Initialize logging
 logging.basicConfig(
@@ -541,7 +542,9 @@ def prepare_scene_directory(args, colmap_cfg):
         # Priority 1: Check if it's a COLMAP scene
         if check_colmap_scene(args.input):
             print(f"✅ Found existing COLMAP scene: {args.input}")
-            return args.input
+            # Check if undistortion is needed and perform it
+            scene_dir = undistort_colmap_scene(args.input)
+            return scene_dir
         
         # Priority 2: Check for images in the directory
         images = find_images_in_directory(args.input)
