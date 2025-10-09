@@ -3,9 +3,9 @@ workspace: "power-grid-check-dev-ml"
 environment:
   name: "sensynmldev.azurecr.io/edgs-app"
   version: "latest"
-compute: "NC24ads-A100"
+compute: "NC24ads-A100" #NC24ads-A100, lambda-cluster
 command: "python script/fit_model_to_scene_full.py --config train_01_highest_quality --output_path outputs/"
 data: # optional
-  input: "tower_closeup_1fps_bgblur_275_278_colmap" # This must match your registered Azure ML data asset name
+  input: "tower_closeup_1fps_275_278" # This must match your registered Azure ML data asset name
 metadata: # optional
   task: "gaussian_splatting"
