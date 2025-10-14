@@ -1,6 +1,21 @@
 # COLMAP Configuration: 01 - Highest Quality
+# Matches COLMAP automatic_reconstructor default parameters
 # Best possible quality reconstruction, highest memory usage
 # Recommended for: High-end GPUs (16GB+), when quality is paramount
+# Reference: colmap/src/colmap/controllers/incremental_pipeline.h
+#            colmap/src/colmap/feature/sift.h
+#            colmap/src/colmap/feature/extractor.h
+#            colmap/src/colmap/feature/matcher.h
+
+# Optional: specify data type for matching strategy selection
+# Options: 'video', 'individual', 'internet'
+# If not specified, defaults to 'individual'
+data_type: individual
+
+# Optional: path to vocabulary tree for efficient matching on large datasets (>=200 images)
+# Download from: https://demuc.de/colmap/
+# Example: vocab_tree_flickr100K_words32K.bin
+# vocab_tree_path: /path/to/vocab_tree_flickr100K_words32K.bin
 
 # Video/Image preprocessing settings
 preprocessing:
@@ -8,38 +23,41 @@ preprocessing:
   max_image_size: -1           # Keep original resolution for highest quality
 
 sift_extraction:
-  max_num_features: 16384      # Very high feature count for best quality
-  max_image_size: 3200         # High resolution processing
-  first_octave: -1             # Include super-resolution features for detail
-  num_octaves: 4               # Full octave range
-  octave_resolution: 3
-  peak_threshold: 0.001        # Very sensitive feature detection
-  edge_threshold: 10           # Standard edge filtering
+  # COLMAP defaults from colmap/src/colmap/feature/sift.h
+  max_num_features: 8192       # Match COLMAP default (line 39)
+  max_image_size: 3200         # Match COLMAP default (extractor.h:51)
+  first_octave: -1             # Match COLMAP default (line 42)
+  num_octaves: 4               # Match COLMAP default (line 45)
+  octave_resolution: 3         # Match COLMAP default (line 48)
+  peak_threshold: 0.0067       # Match COLMAP default (0.02/3, line 51)
+  edge_threshold: 10           # Match COLMAP default (line 54)
   estimate_affine_shape: false
   domain_size_pooling: false
   upright: false
 
 sift_matching:
-  max_ratio: 0.8               # Strict ratio test
-  max_distance: 0.7            # Strict distance threshold
-  cross_check: true
-  max_num_matches: 32768       # Allow many matches
+  # COLMAP defaults from colmap/src/colmap/feature/sift.h and matcher.h
+  max_ratio: 0.8               # Match COLMAP default (sift.h:110)
+  max_distance: 0.7            # Match COLMAP default (sift.h:113)
+  cross_check: true            # Match COLMAP default (sift.h:116)
+  max_num_matches: 32768       # Match COLMAP default (matcher.h:74)
 
 pipeline:
-  min_num_matches: 5           # Low threshold for connections
-  multiple_models: false       # Force single model
-  max_num_models: 1
-  max_model_overlap: 100
-  min_model_size: 50
+  # COLMAP defaults from colmap/src/colmap/controllers/incremental_pipeline.h
+  min_num_matches: 15          # Match COLMAP default (line 46) - CRITICAL FIX
+  multiple_models: true        # Match COLMAP default (line 52) - CRITICAL FIX
+  max_num_models: 50           # Match COLMAP default (line 55) - CRITICAL FIX
+  max_model_overlap: 20        # Match COLMAP default (line 60) - CRITICAL FIX
+  min_model_size: 10           # Match COLMAP default (line 65) - CRITICAL FIX
   extract_colors: true
   num_threads: -1              # Use all threads
 
 mapper:
   init_min_num_inliers: 15
-  init_max_error: 4.0          # Strict error tolerance
+  init_max_error: 4.0
   init_min_tri_angle: 2.0
   abs_pose_min_num_inliers: 15
   abs_pose_max_error: 8.0
   abs_pose_min_inlier_ratio: 0.15
-  filter_max_reproj_error: 4.0  # Strict filtering
+  filter_max_reproj_error: 4.0
   filter_min_tri_angle: 0.5

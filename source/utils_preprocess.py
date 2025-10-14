@@ -673,21 +673,51 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
     if 'max_num_matches' in matching_config:
         matching_options.max_num_matches = matching_config['max_num_matches']
     
-    # Use sequential + exhaustive matching for better coverage
+    # Use COLMAP automatic_reconstructor matching strategy
+    # Match based on data type and dataset size (similar to COLMAP's logic)
+    # Reference: colmap/src/colmap/controllers/automatic_reconstruction.cc:209-232
+
+    # Count number of images in database
+    database = pycolmap.Database(database_path)
+    num_images = database.num_images()
+    database.close()
+
+    print(f"Database contains {num_images} images")
+
+    # Determine matching strategy based on image count
+    # COLMAP uses: < 200 images OR no vocab tree -> exhaustive
+    #              >= 200 images AND vocab tree -> vocab tree matching
+    # For video data, COLMAP uses sequential matching
+
+    # Check if vocab tree is available
+    vocab_tree_path = config.get('vocab_tree_path', None)
+    data_type = config.get('data_type', 'individual')  # 'video', 'individual', or 'internet'
+
     try:
-        print("Running sequential matching...")
-        pycolmap.match_sequential(database_path, 
-                                sift_options=matching_options,
-                                overlap=20,  # Match with neighboring frames
-                                quadratic_overlap=False)
-        print("Sequential matching completed.")
-        
-        print("Running exhaustive matching...")
-        pycolmap.match_exhaustive(database_path, sift_options=matching_options)
-        print("Exhaustive matching completed.")
+        if data_type == 'video':
+            # For video data: use sequential matching
+            print("Using sequential matching for video data...")
+            pycolmap.match_sequential(database_path,
+                                    sift_options=matching_options,
+                                    overlap=20,
+                                    quadratic_overlap=False)
+            print("Sequential matching completed.")
+        elif vocab_tree_path and num_images >= 200:
+            # For large datasets with vocab tree: use vocabulary tree matching
+            print(f"Using vocabulary tree matching for {num_images} images...")
+            print(f"Vocab tree path: {vocab_tree_path}")
+            pycolmap.match_vocabtree(database_path,
+                                   vocab_tree_path=vocab_tree_path,
+                                   sift_options=matching_options)
+            print("Vocabulary tree matching completed.")
+        else:
+            # For small datasets or without vocab tree: use exhaustive matching
+            print(f"Using exhaustive matching for {num_images} images...")
+            pycolmap.match_exhaustive(database_path, sift_options=matching_options)
+            print("Exhaustive matching completed.")
     except Exception as e:
         print(f"Matching failed: {e}")
-        print("Trying exhaustive matching only...")
+        print("Falling back to exhaustive matching...")
         pycolmap.match_exhaustive(database_path, sift_options=matching_options)
     
     print(f"Finished feature matching in {(time.time() - start_time):.2f}s.")
