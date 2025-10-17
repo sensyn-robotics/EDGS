@@ -679,7 +679,7 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
 
     # Count number of images in database
     database = pycolmap.Database(database_path)
-    num_images = database.num_images()
+    num_images = database.num_images
     database.close()
 
     print(f"Database contains {num_images} images")
