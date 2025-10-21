@@ -275,7 +275,7 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir):
         ("right", -90, 0, 0),    # Right face
         ("back", 180, 0, 0),     # Back face
         ("left", 90, 0, 0),      # Left face
-        ("top", 0, -90, 0),      # Top face
+        ("top", 0, 90, 0),       # Top face (pitch=90 looks up)
     ]
 
     output_paths = []
