@@ -99,6 +99,7 @@ From command line - Complete command with all possible arguments:
 ```bash
 docker compose exec edgs-app python script/fit_model_to_scene_full.py \
     --input <input>                       # Path to input: COLMAP scene, image directory, video directory, or video file \
+    --360                                 # Enable 360° equirectangular video processing (optional) \
     --colmap_config <colmap_preset>       # COLMAP preset (01=highest to 06=lowest quality) \
     --config <config_name>                # Training config (01=highest to 06=lowest quality) \
     --output_path <output_dir>            # Where to save EDGS model (optional)
@@ -125,6 +126,9 @@ docker compose exec edgs-app python script/fit_model_to_scene_full.py \
 # Simple usage
 python script/fit_model_to_scene_full.py --input video.mp4
 
+# 360° equirectangular video (converts to 5 cubemap faces: front, right, back, left, top)
+python script/fit_model_to_scene_full.py --input video_360.mp4 --360
+
 # Low memory system
 python script/fit_model_to_scene_full.py --input video.mp4 \
     --config train_06_lowest_quality --colmap_config colmap_06_lowest_quality
@@ -132,6 +136,10 @@ python script/fit_model_to_scene_full.py --input video.mp4 \
 # High quality
 python script/fit_model_to_scene_full.py --input video.mp4 \
     --config train_02_high_quality --colmap_config colmap_02_high_quality
+
+# 360° video with low memory settings
+python script/fit_model_to_scene_full.py --input video_360.mp4 --360 \
+    --config train_05_low_quality --colmap_config colmap_05_low_quality
 ```
 
 #### Option C

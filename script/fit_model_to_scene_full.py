@@ -251,15 +251,69 @@ def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
     return output_path
 
 
-def process_video_to_colmap_scene(video_path, output_path, colmap_cfg):
+def convert_equirectangular_to_cubemap(input_image_path, output_dir):
+    """
+    Convert an equirectangular 360 image to 5 cubemap face images.
+
+    Note: Bottom face is excluded to avoid capturing the camera operator.
+
+    Args:
+        input_image_path: Path to equirectangular image
+        output_dir: Directory to save cubemap face images
+
+    Returns:
+        List of paths to the 5 generated cubemap face images (front, right, back, left, top)
+    """
+    os.makedirs(output_dir, exist_ok=True)
+    basename = os.path.splitext(os.path.basename(input_image_path))[0]
+
+    # Define the 5 cubemap faces with their respective ffmpeg parameters
+    # Format: (suffix, yaw, pitch, roll)
+    # Note: Bottom face is excluded as it often captures the camera operator
+    faces = [
+        ("front", 0, 0, 0),      # Front face
+        ("right", -90, 0, 0),    # Right face
+        ("back", 180, 0, 0),     # Back face
+        ("left", 90, 0, 0),      # Left face
+        ("top", 0, -90, 0),      # Top face
+    ]
+
+    output_paths = []
+
+    for face_name, yaw, pitch, roll in faces:
+        output_path = os.path.join(output_dir, f"{basename}_{face_name}.png")
+
+        # Build ffmpeg command for v360 filter
+        # e:rectilinear converts equirectangular to rectilinear projection
+        # h_fov and v_fov set the field of view to 90 degrees for cube face
+        cmd = [
+            "ffmpeg",
+            "-i", input_image_path,
+            "-vf", f"v360=e:rectilinear:h_fov=90:v_fov=90:yaw={yaw}:pitch={pitch}:roll={roll}",
+            "-y",  # Overwrite output files
+            output_path
+        ]
+
+        try:
+            subprocess.run(cmd, check=True, capture_output=True, text=True)
+            output_paths.append(output_path)
+        except subprocess.CalledProcessError as e:
+            print(f"  ⚠️ Warning: Failed to generate {face_name} face: {e.stderr}")
+            continue
+
+    return output_paths
+
+
+def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=False):
     """
     Process video(s) with uniform frame extraction and run COLMAP.
-    
+
     Args:
         video_path: Path to video file or directory
         output_path: Directory to save COLMAP scene
         colmap_cfg: COLMAP configuration dictionary with preprocessing settings
-        
+        is_360: If True, process as 360 degree equirectangular video
+
     Returns:
         scene_dir: Path to COLMAP scene directory
     """
@@ -329,15 +383,39 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg):
                 max_size=max_image_size if max_image_size > 0 else 2048
             )
             
-            # Move frames to combined directory with global numbering
-            for frame_path in frame_paths:
-                new_filename = f"{frame_counter:08d}.png"
-                new_path = os.path.join(images_dir, new_filename)
-                shutil.move(frame_path, new_path)
-                all_frame_paths.append(new_path)
-                frame_counter += 1
-            
-            print(f"  ✅ Extracted {len(frame_paths)} frames")
+            # Process frames: convert to cubemap if 360 mode, otherwise just move
+            if is_360:
+                print(f"  🌐 Converting {len(frame_paths)} equirectangular frames to cubemap faces...")
+                cubemap_temp_dir = os.path.join(output_path, f"temp_cubemap_{idx}")
+                os.makedirs(cubemap_temp_dir, exist_ok=True)
+
+                for frame_path in frame_paths:
+                    # Convert each equirectangular frame to 6 cubemap faces
+                    cubemap_faces = convert_equirectangular_to_cubemap(frame_path, cubemap_temp_dir)
+
+                    # Move cubemap faces to combined directory with global numbering
+                    for face_path in cubemap_faces:
+                        new_filename = f"{frame_counter:08d}.png"
+                        new_path = os.path.join(images_dir, new_filename)
+                        shutil.move(face_path, new_path)
+                        all_frame_paths.append(new_path)
+                        frame_counter += 1
+
+                # Clean up cubemap temp directory
+                if os.path.exists(cubemap_temp_dir):
+                    shutil.rmtree(cubemap_temp_dir)
+
+                print(f"  ✅ Converted {len(frame_paths)} frames to {len(frame_paths) * 5} cubemap faces (excluding bottom)")
+            else:
+                # Move frames to combined directory with global numbering
+                for frame_path in frame_paths:
+                    new_filename = f"{frame_counter:08d}.png"
+                    new_path = os.path.join(images_dir, new_filename)
+                    shutil.move(frame_path, new_path)
+                    all_frame_paths.append(new_path)
+                    frame_counter += 1
+
+                print(f"  ✅ Extracted {len(frame_paths)} frames")
             
         except Exception as e:
             print(f"  ❌ Failed to extract frames: {e}")
@@ -499,9 +577,14 @@ def parse_arguments():
         "--colmap_config",
         type=str,
         default="colmap_03_optimal_quality",
-        choices=["colmap_01_highest_quality", "colmap_02_high_quality", "colmap_03_optimal_quality", 
+        choices=["colmap_01_highest_quality", "colmap_02_high_quality", "colmap_03_optimal_quality",
                  "colmap_04_medium_quality", "colmap_05_low_quality", "colmap_06_lowest_quality"],
         help="COLMAP configuration profile (01=highest to 06=lowest quality).",
+    )
+    parser.add_argument(
+        "--360",
+        action="store_true",
+        help="Process 360 degree equirectangular video by converting to cubemap faces.",
     )
     return parser.parse_args()
 
@@ -561,25 +644,35 @@ def prepare_scene_directory(args, colmap_cfg):
         videos = find_videos_in_directory(args.input)
         if videos:
             print(f"🎥 Found {len(videos)} video(s) in directory")
+            # Use args directly with attribute name matching the CLI flag
+            is_360_mode = getattr(args, '360', False)
+            if is_360_mode:
+                print("🌐 360 degree video mode enabled")
             scene_dir = process_video_to_colmap_scene(
                 video_path=args.input,
                 output_path=os.path.join(base_output_path, "video_scene"),
-                colmap_cfg=colmap_cfg
+                colmap_cfg=colmap_cfg,
+                is_360=is_360_mode
             )
             return scene_dir
-        
+
         print(f"ERROR: No COLMAP scene, images, or videos found in: {args.input}")
         sys.exit(1)
-    
+
     else:
         # Single file - assume it's a video
         if not args.input.lower().endswith(('.mp4', '.mov', '.avi', '.mkv', '.webm')):
             print(f"⚠️ Warning: {args.input} may not be a video file, attempting to process anyway...")
-        
+
+        # Use args directly with attribute name matching the CLI flag
+        is_360_mode = getattr(args, '360', False)
+        if is_360_mode:
+            print("🌐 360 degree video mode enabled")
         scene_dir = process_video_to_colmap_scene(
             video_path=args.input,
             output_path=os.path.join(base_output_path, "video_scene"),
-            colmap_cfg=colmap_cfg
+            colmap_cfg=colmap_cfg,
+            is_360=is_360_mode
         )
         return scene_dir
 
