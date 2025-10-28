@@ -544,6 +544,24 @@ def init_gaussians_with_corr(gaussians, scene, cfg, device, verbose = False, rom
     keypoint_fit_error_tolerance = cfg.proj_err_tolerance
     visualizations = {}
     viewpoint_stack = scene.getTrainCameras().copy()
+
+    # Check if we have enough cameras for initialization
+    if len(viewpoint_stack) < 2:
+        raise RuntimeError(
+            f"ERROR: COLMAP reconstruction produced only {len(viewpoint_stack)} camera(s).\n"
+            f"EDGS requires at least 2 cameras for initialization.\n\n"
+            f"Possible causes:\n"
+            f"1. Not enough frames extracted from video (try higher target_fps)\n"
+            f"2. Insufficient feature matches between frames\n"
+            f"3. Scene has too much motion blur or lacks texture\n"
+            f"4. COLMAP reconstruction failed\n\n"
+            f"Suggestions:\n"
+            f"- Check if images/ directory has enough images\n"
+            f"- Try a different colmap_config (e.g., colmap_03_optimal_quality)\n"
+            f"- Ensure video has enough overlap between frames\n"
+            f"- Check COLMAP logs for reconstruction errors"
+        )
+
     NUM_REFERENCE_FRAMES = min(cfg.num_refs, len(viewpoint_stack))
     NUM_NNS_PER_REFERENCE = min(cfg.nns_per_ref , len(viewpoint_stack))
     # Select cameras using K-means

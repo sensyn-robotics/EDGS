@@ -836,6 +836,31 @@ def main():
             sys.exit(1)
         raise
 
+    # Check if COLMAP reconstruction has enough cameras
+    train_cameras = gs.scene.getTrainCameras()
+    num_cameras = len(train_cameras)
+    print(f"\n📷 COLMAP reconstruction contains {num_cameras} camera(s)")
+
+    if num_cameras < 2:
+        print("\n❌ ERROR: COLMAP reconstruction failed or produced insufficient results")
+        print(f"   Found only {num_cameras} camera(s), but EDGS requires at least 2\n")
+        print("Possible causes:")
+        print("  1. Not enough frames extracted from video")
+        print("  2. Insufficient feature matches between frames")
+        print("  3. Scene has too much motion blur or lacks texture")
+        print("  4. Video is too short or has little camera movement\n")
+        print("Suggestions:")
+        images_dir = os.path.join(scene_dir, "images")
+        if os.path.exists(images_dir):
+            num_images = len([f for f in os.listdir(images_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
+            print(f"  - Images extracted: {num_images}")
+            if num_images < 10:
+                print(f"    → Try higher target_fps in colmap_config (current: {colmap_cfg.get('preprocessing', {}).get('target_fps', 'unknown')})")
+        print(f"  - Try a different COLMAP config (current: {args.colmap_config})")
+        print(f"  - Ensure video has enough camera movement and overlap between frames")
+        print(f"  - Check COLMAP logs in: {scene_dir}")
+        sys.exit(1)
+
     # Initialize trainer
     trainer = EDGSTrainer(
         GS=gs,
@@ -847,7 +872,13 @@ def main():
     # Initialize with correspondence matching
     print("\n🔧 Initializing with correspondence matching...")
     trainer.timer.start()
-    trainer.init_with_corr(cfg.init_wC)
+    try:
+        trainer.init_with_corr(cfg.init_wC)
+    except RuntimeError as e:
+        if "COLMAP reconstruction produced only" in str(e):
+            print(f"\n❌ {e}")
+            sys.exit(1)
+        raise
     trainer.timer.pause()
 
     # Visualize initial views
