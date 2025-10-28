@@ -142,6 +142,33 @@ python script/fit_model_to_scene_full.py --input video_360.mp4 --360 \
     --config train_05_low_quality --colmap_config colmap_05_low_quality
 ```
 
+**🔄 Resumable Pipeline:**
+
+The `fit_model_to_scene_full.py` script now supports automatic checkpoint detection and resume functionality. Each stage (image extraction, COLMAP reconstruction, EDGS training) checks if it has already been completed before running:
+
+- **Image Extraction**: If `images/` directory exists with frames, skips extraction
+- **COLMAP Reconstruction**: If `sparse/` directory exists with valid scene data, skips COLMAP
+- **EDGS Training**: If trained model exists (checkpoint or point cloud files), skips training
+
+This means you can:
+- ✅ Resume after interruptions without losing progress
+- ✅ Re-run the same command safely - completed stages are skipped
+- ✅ Save computation time by not redoing expensive operations
+
+```bash
+# First run - does everything
+python script/fit_model_to_scene_full.py --input video.mp4 --output_path ./outputs/my_scene
+
+# Second run - automatically skips completed stages
+python script/fit_model_to_scene_full.py --input video.mp4 --output_path ./outputs/my_scene
+```
+
+To force retraining from scratch, delete the output directory first:
+```bash
+rm -rf ./outputs/my_scene
+python script/fit_model_to_scene_full.py --input video.mp4 --output_path ./outputs/my_scene
+```
+
 #### Option C
 Using Jupyter lab.
 ```

@@ -192,30 +192,47 @@ def save_configs_to_output(train_config_name, colmap_config_name, model_path):
 def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
     """
     Process a directory of images with COLMAP.
-    
+
     Args:
         image_dir: Directory containing images
         output_path: Directory to save COLMAP scene
         colmap_cfg: COLMAP configuration dictionary with preprocessing settings
-        
+
     Returns:
         scene_dir: Path to COLMAP scene directory
     """
     print(f"🎨 Processing images from directory: {image_dir}")
-    
+
     # Find all images
     image_paths = find_images_in_directory(image_dir)
     if not image_paths:
         raise ValueError(f"No image files found in {image_dir}")
-    
+
     print(f"📊 Found {len(image_paths)} images")
-    
+
     # Get preprocessing settings from colmap config
     max_image_size = colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)
-    
+
     # Create output directory
     os.makedirs(output_path, exist_ok=True)
     images_dir = os.path.join(output_path, "images")
+
+    # Check if images already processed
+    if os.path.exists(images_dir):
+        existing_images = find_images_in_directory(images_dir)
+        if existing_images and len(existing_images) >= len(image_paths):
+            print(f"✅ Found {len(existing_images)} processed images in {images_dir}, skipping processing")
+
+            # Check if COLMAP has already been run
+            if check_colmap_scene(output_path):
+                print(f"✅ COLMAP reconstruction already exists, skipping COLMAP stage")
+                return output_path
+            else:
+                print("🏗️  Running COLMAP reconstruction on existing images...")
+                run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
+                print(f"🎉 COLMAP processing complete!")
+                return output_path
+
     os.makedirs(images_dir, exist_ok=True)
     
     # Copy and optionally resize images
@@ -319,7 +336,7 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
     """
     # Check if input is a directory or single video file
     is_directory = os.path.isdir(video_path)
-    
+
     if is_directory:
         print(f"🎥 Processing videos from directory: {video_path}")
         videos = find_videos_in_directory(video_path)
@@ -329,10 +346,27 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
     else:
         print(f"🎥 Processing single video: {video_path}")
         videos = [video_path]
-    
+
     # Create output directory
     os.makedirs(output_path, exist_ok=True)
     images_dir = os.path.join(output_path, "images")
+
+    # Check if images already exist
+    if os.path.exists(images_dir):
+        existing_images = find_images_in_directory(images_dir)
+        if existing_images:
+            print(f"✅ Found {len(existing_images)} existing images in {images_dir}, skipping extraction")
+
+            # Check if COLMAP has already been run
+            if check_colmap_scene(output_path):
+                print(f"✅ COLMAP reconstruction already exists, skipping COLMAP stage")
+                return output_path
+            else:
+                print("🏗️  Running COLMAP reconstruction on existing images...")
+                run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
+                print(f"🎉 COLMAP processing complete!")
+                return output_path
+
     os.makedirs(images_dir, exist_ok=True)
     
     # Process each video
@@ -677,12 +711,43 @@ def prepare_scene_directory(args, colmap_cfg):
         return scene_dir
 
 
+def check_edgs_training_complete(model_path):
+    """
+    Check if EDGS training has already completed.
+
+    Args:
+        model_path: Path to EDGS output directory
+
+    Returns:
+        bool: True if training is complete
+    """
+    if not os.path.exists(model_path):
+        return False
+
+    # Check for common model output files
+    point_cloud_file = os.path.join(model_path, "point_cloud", "iteration_30000", "point_cloud.ply")
+    checkpoint_file = os.path.join(model_path, "chkpnt30000.pth")
+
+    # Look for any iteration checkpoint
+    if os.path.exists(os.path.join(model_path, "point_cloud")):
+        point_cloud_dirs = [d for d in os.listdir(os.path.join(model_path, "point_cloud"))
+                           if d.startswith("iteration_")]
+        if point_cloud_dirs:
+            # Check if final iteration exists
+            iterations = [int(d.replace("iteration_", "")) for d in point_cloud_dirs]
+            max_iter = max(iterations)
+            if max_iter >= 30000:  # Typical final iteration
+                return True
+
+    return os.path.exists(point_cloud_file) or os.path.exists(checkpoint_file)
+
+
 def configure_resolution(cfg, colmap_cfg):
     """Configure the resolution parameter based on max_image_size from colmap config."""
     max_image_size = colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)
     if max_image_size <= 0:
         return
-    
+
     if max_image_size <= 64:
         cfg.gs.dataset.resolution = 8
     elif max_image_size <= 128:
@@ -695,7 +760,7 @@ def configure_resolution(cfg, colmap_cfg):
         cfg.gs.dataset.resolution = 1
     else:
         cfg.gs.dataset.resolution = -1
-    
+
     print(f"📐 Resolution scale: {cfg.gs.dataset.resolution} (for max_image_size={max_image_size})")
 
 
@@ -734,23 +799,30 @@ def main():
     print(f"\n📁 COLMAP scene: {scene_dir}")
     print(f"📦 EDGS output: {model_path}")
     os.makedirs(model_path, exist_ok=True)
-    
+
+    # Check if EDGS training has already completed
+    if check_edgs_training_complete(model_path):
+        print("\n✅ EDGS training already completed!")
+        print(f"Model exists at: {model_path}")
+        print("\nTo retrain, delete the model directory and run again.")
+        return
+
     # Save both config files for reference
     save_configs_to_output(args.config, args.colmap_config, model_path)
-    
+
     # Initialize WandB
     initialize_wandb(cfg)
     omegaconf.OmegaConf.resolve(cfg)
-    
+
     # Configure resolution
     configure_resolution(cfg, colmap_cfg)
-    
+
     # Set random seed
     set_seed(cfg.seed)
-    
+
     # Setup CUDA
     setup_cuda()
-    
+
     # Initialize Gaussian Splatting model
     try:
         gs = hydra.utils.instantiate(cfg.gs)
@@ -763,7 +835,7 @@ def main():
             print(f"\nError: {e}")
             sys.exit(1)
         raise
-    
+
     # Initialize trainer
     trainer = EDGSTrainer(
         GS=gs,
@@ -771,30 +843,30 @@ def main():
         device=cfg.device,
         log_wandb=(cfg.wandb.mode != "disabled"),
     )
-    
+
     # Initialize with correspondence matching
     print("\n🔧 Initializing with correspondence matching...")
     trainer.timer.start()
     trainer.init_with_corr(cfg.init_wC)
     trainer.timer.pause()
-    
+
     # Visualize initial views
     print("📸 Generating initial visualizations...")
     viewpoint_cams = visualize_initial_views(trainer, model_path)
-    
+
     # Train the model
     print("\n🚀 Starting EDGS optimization...")
     trainer.saving_iterations = []
     trainer.train(cfg.train)
-    
+
     # Visualize final views
     print("📸 Generating final visualizations...")
     visualize_final_views(trainer, viewpoint_cams)
-    
+
     # Save the final model
     print("\n💾 Saving final model...")
     trainer.save_model()
-    
+
     print("\n✨ Training complete!")
     print(f"Results saved to: {model_path}")
 
