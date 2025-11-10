@@ -6,6 +6,6 @@ environment:
 compute: "NC24ads-A100" #NC24ads-A100, lambda-cluster
 command: "python script/fit_model_to_scene_full.py --config train_01_highest_quality --output_path outputs/"
 data: # optional
-  input: "tower_closeup_1fps_275_278" # This must match your registered Azure ML data asset name
+  input: "20251006_141807_360" # This must match your registered Azure ML data asset name
 metadata: # optional
   task: "gaussian_splatting"
