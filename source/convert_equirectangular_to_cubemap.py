@@ -8,8 +8,14 @@ This module provides functionality to convert 360 degree equirectangular images
 into cubemap face projections using ffmpeg's v360 filter.
 """
 
+import argparse
 import os
+import shutil
 import subprocess
+import sys
+import tempfile
+
+VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'}
 
 
 def convert_equirectangular_to_cubemap(input_image_path, output_dir):
@@ -67,8 +73,6 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir):
 
 def main():
     """Command-line interface for converting equirectangular images to cubemap."""
-    import argparse
-
     parser = argparse.ArgumentParser(
         description="Convert 360° equirectangular images/videos to cubemap faces."
     )
@@ -91,8 +95,8 @@ def main():
         "--fps",
         type=float,
         metavar="FPS",
-        default=None,
-        help="For video input: extract frames at this rate (frames per second). Example: --fps 1.0 extracts 1 frame every second"
+        default=1.0,
+        help="For video input: extract frames at this rate (frames per second). Default: 1.0"
     )
 
     args = parser.parse_args()
@@ -105,17 +109,19 @@ def main():
         print(f"❌ Error: Input file not found: {input_path}")
         return 1
 
-    # Check that only one option is used
-    if args.time is not None and args.fps is not None:
-        print("❌ Error: Cannot use both --time and --fps options together")
-        return 1
+    # Detect if input is a video file
+    ext = os.path.splitext(input_path)[1].lower()
+    is_video = ext in VIDEO_EXTENSIONS
+
+    # For image files, disable fps-based extraction
+    if not is_video and args.time is None:
+        args.fps = None
 
     # Handle video input with single frame extraction
     if args.time is not None:
         print(f"📹 Extracting frame from video at {args.time} seconds...")
 
         # Create temporary directory for frame
-        import tempfile
         temp_dir = tempfile.mkdtemp()
         frame_path = os.path.join(temp_dir, "frame.png")
 
@@ -163,7 +169,6 @@ def main():
         print(f"   Extracting approximately {num_frames} frames")
 
         # Extract frames at specified fps
-        import tempfile
         temp_dir = tempfile.mkdtemp()
 
         all_cubemap_faces = []
@@ -198,7 +203,6 @@ def main():
                 continue
 
         # Clean up temp directory
-        import shutil
         shutil.rmtree(temp_dir)
 
         print()
@@ -220,7 +224,6 @@ def main():
 
         # Clean up temp directory if we created one
         if args.time is not None:
-            import shutil
             shutil.rmtree(temp_dir)
 
         return 0
@@ -231,5 +234,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())
