@@ -60,6 +60,8 @@ from source.process_video_to_colmap_scene import (
     check_colmap_scene,
     find_videos_in_directory,
     find_images_in_directory,
+    run_colmap_with_retry,
+    get_min_registered_images,
 )
 from script.undistort_colmap_scene import undistort_colmap_scene
 
@@ -132,15 +134,20 @@ def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
         if existing_images and len(existing_images) >= len(image_paths):
             print(f"✅ Found {len(existing_images)} processed images in {images_dir}, skipping processing")
 
-            # Check if COLMAP has already been run
-            if check_colmap_scene(output_path):
-                print(f"✅ COLMAP reconstruction already exists, skipping COLMAP stage")
+            # Calculate minimum required registered images
+            min_registered = get_min_registered_images(images_dir)
+
+            # Check if COLMAP has already been run with sufficient quality
+            if check_colmap_scene(output_path, min_registered_images=min_registered):
+                print(f"✅ COLMAP reconstruction already exists with sufficient registered images")
                 return output_path
             else:
                 print("🏗️  Running COLMAP reconstruction on existing images...")
-                run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
-                print(f"🎉 COLMAP processing complete!")
-                return output_path
+                if run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+                    print(f"🎉 COLMAP processing complete!")
+                    return output_path
+                else:
+                    raise RuntimeError("COLMAP reconstruction failed - see suggestions above")
 
     os.makedirs(images_dir, exist_ok=True)
     
@@ -168,13 +175,14 @@ def process_images_to_colmap_scene(image_dir, output_path, colmap_cfg):
         cv2.imwrite(dst_path, img)
     
     print(f"✅ Processed {len(image_paths)} images")
-    
-    # Run COLMAP reconstruction
+
+    # Run COLMAP reconstruction with retry logic
     print("🏗️  Running COLMAP reconstruction...")
-    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
-    
-    print(f"🎉 COLMAP processing complete!")
-    return output_path
+    if run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+        print(f"🎉 COLMAP processing complete!")
+        return output_path
+    else:
+        raise RuntimeError("COLMAP reconstruction failed - see suggestions above")
 
 
 def check_existing_colmap_scene(colmap_path):

@@ -18,15 +18,16 @@ from source.utils_preprocess import run_colmap_on_scene
 from source.convert_equirectangular_to_cubemap import convert_equirectangular_to_cubemap
 
 
-def check_colmap_scene(directory_path):
+def check_colmap_scene(directory_path, min_registered_images=2):
     """
-    Check if a directory contains a valid COLMAP scene.
+    Check if a directory contains a valid COLMAP scene with sufficient registered images.
 
     Args:
         directory_path: Directory to check
+        min_registered_images: Minimum number of registered images required (default: 2)
 
     Returns:
-        bool: True if valid COLMAP scene exists
+        bool: True if valid COLMAP scene exists with enough registered images
     """
     if not os.path.isdir(directory_path):
         return False
@@ -37,28 +38,26 @@ def check_colmap_scene(directory_path):
         return False
 
     # Check for model folders (0, 1, etc.) or direct files
-    has_model = False
+    model_dir = None
 
     # Check numbered model directories
     for i in range(10):  # Check first 10 possible model folders
-        model_dir = os.path.join(sparse_dir, str(i))
-        if os.path.exists(model_dir):
+        candidate_dir = os.path.join(sparse_dir, str(i))
+        if os.path.exists(candidate_dir):
             # Check for essential COLMAP files
-            cameras = os.path.join(model_dir, "cameras.bin")
-            images = os.path.join(model_dir, "images.bin")
-            points = os.path.join(model_dir, "points3D.bin")
+            cameras = os.path.join(candidate_dir, "cameras.bin")
+            images = os.path.join(candidate_dir, "images.bin")
 
-            cameras_txt = os.path.join(model_dir, "cameras.txt")
-            images_txt = os.path.join(model_dir, "images.txt")
-            points_txt = os.path.join(model_dir, "points3D.txt")
+            cameras_txt = os.path.join(candidate_dir, "cameras.txt")
+            images_txt = os.path.join(candidate_dir, "images.txt")
 
             if (os.path.exists(cameras) and os.path.exists(images)) or \
                (os.path.exists(cameras_txt) and os.path.exists(images_txt)):
-                has_model = True
+                model_dir = candidate_dir
                 break
 
     # Also check for direct files in sparse directory
-    if not has_model:
+    if model_dir is None:
         cameras = os.path.join(sparse_dir, "cameras.bin")
         images = os.path.join(sparse_dir, "images.bin")
         cameras_txt = os.path.join(sparse_dir, "cameras.txt")
@@ -66,9 +65,35 @@ def check_colmap_scene(directory_path):
 
         if (os.path.exists(cameras) and os.path.exists(images)) or \
            (os.path.exists(cameras_txt) and os.path.exists(images_txt)):
-            has_model = True
+            model_dir = sparse_dir
 
-    return has_model
+    if model_dir is None:
+        return False
+
+    # Check the number of registered images
+    try:
+        import pycolmap
+        # Try different pycolmap APIs (different versions have different APIs)
+        if hasattr(pycolmap, 'Reconstruction'):
+            reconstruction = pycolmap.Reconstruction(model_dir)
+            num_registered = len(reconstruction.images)
+        elif hasattr(pycolmap, 'SceneManager'):
+            scene_manager = pycolmap.SceneManager(model_dir)
+            scene_manager.load()
+            num_registered = len(scene_manager.images)
+        else:
+            print(f"⚠️  Unknown pycolmap API, falling back to file check")
+            return True
+
+        if num_registered < min_registered_images:
+            print(f"⚠️  COLMAP scene exists but only has {num_registered} registered images (need {min_registered_images}+)")
+            return False
+        print(f"✅ COLMAP scene has {num_registered} registered images")
+        return True
+    except Exception as e:
+        print(f"⚠️  Could not verify COLMAP reconstruction: {e}")
+        # Fall back to just checking file existence
+        return True
 
 
 def find_videos_in_directory(directory_path, extensions=('.mp4', '.MP4', '.mov', '.MOV', '.avi', '.AVI')):
@@ -114,6 +139,150 @@ def find_images_in_directory(directory_path, extensions=('.png', '.PNG', '.jpg',
     return sorted(images)
 
 
+def get_min_registered_images(images_dir):
+    """
+    Calculate minimum required registered images based on total images.
+    At least 30% of images should be registered, with minimum of 2.
+    """
+    if not os.path.exists(images_dir):
+        return 2
+    total_images = len(find_images_in_directory(images_dir))
+    # Require at least 30% of images to be registered, minimum 2
+    return max(2, int(total_images * 0.3))
+
+
+def run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+    """
+    Run COLMAP with retry logic using progressively more lenient settings.
+
+    Args:
+        output_path: Directory containing images and where COLMAP output goes
+        colmap_cfg: COLMAP configuration dictionary
+        images_dir: Directory containing images
+
+    Returns:
+        bool: True if reconstruction was successful
+    """
+    import copy
+
+    min_registered = get_min_registered_images(images_dir)
+    total_images = len(find_images_in_directory(images_dir))
+
+    # Ensure video data type for sequential matching (critical for video input)
+    if 'data_type' not in colmap_cfg or colmap_cfg.get('data_type') == 'individual':
+        print("🔧 Setting data_type to 'video' for sequential matching")
+        colmap_cfg = copy.deepcopy(colmap_cfg)
+        colmap_cfg['data_type'] = 'video'
+
+    # Define retry configurations with progressively more lenient settings
+    retry_configs = [
+        # First attempt: original config with video data type
+        {
+            'name': 'original with video matching',
+            'config': colmap_cfg
+        },
+        # Second attempt: more lenient matching
+        {
+            'name': 'lenient matching',
+            'config': {
+                **colmap_cfg,
+                'sift_matching': {
+                    **colmap_cfg.get('sift_matching', {}),
+                    'max_ratio': 0.9,
+                    'max_distance': 0.8,
+                    'cross_check': False,
+                },
+                'pipeline': {
+                    **colmap_cfg.get('pipeline', {}),
+                    'min_num_matches': 10,
+                    'min_model_size': 3,
+                },
+                'mapper': {
+                    **colmap_cfg.get('mapper', {}),
+                    'init_min_num_inliers': 10,
+                    'init_max_error': 8.0,
+                    'init_min_tri_angle': 1.0,
+                    'abs_pose_min_num_inliers': 8,
+                    'abs_pose_max_error': 12.0,
+                    'abs_pose_min_inlier_ratio': 0.1,
+                }
+            }
+        },
+        # Third attempt: very lenient for difficult scenes
+        {
+            'name': 'very lenient (difficult scenes)',
+            'config': {
+                **colmap_cfg,
+                'sift_extraction': {
+                    **colmap_cfg.get('sift_extraction', {}),
+                    'max_num_features': 16384,  # More features
+                    'peak_threshold': 0.004,    # Lower threshold = more features
+                },
+                'sift_matching': {
+                    'max_ratio': 0.95,
+                    'max_distance': 0.9,
+                    'cross_check': False,
+                    'max_num_matches': 65536,
+                },
+                'pipeline': {
+                    **colmap_cfg.get('pipeline', {}),
+                    'min_num_matches': 5,
+                    'min_model_size': 2,
+                },
+                'mapper': {
+                    'init_min_num_inliers': 8,
+                    'init_max_error': 12.0,
+                    'init_min_tri_angle': 0.5,
+                    'abs_pose_min_num_inliers': 5,
+                    'abs_pose_max_error': 16.0,
+                    'abs_pose_min_inlier_ratio': 0.05,
+                    'filter_max_reproj_error': 8.0,
+                    'filter_min_tri_angle': 0.25,
+                }
+            }
+        },
+    ]
+
+    for attempt, retry_info in enumerate(retry_configs):
+        print(f"\n🔄 COLMAP attempt {attempt + 1}/{len(retry_configs)}: {retry_info['name']}")
+
+        # Clear previous reconstruction if retrying
+        if attempt > 0:
+            sparse_dir = os.path.join(output_path, "sparse")
+            db_path = os.path.join(output_path, "database.db")
+            if os.path.exists(sparse_dir):
+                shutil.rmtree(sparse_dir)
+            if os.path.exists(db_path):
+                os.remove(db_path)
+            print("  🗑️  Cleared previous reconstruction data")
+
+        try:
+            run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=retry_info['config'])
+
+            # Check if reconstruction was successful
+            if check_colmap_scene(output_path, min_registered_images=min_registered):
+                print(f"✅ COLMAP reconstruction successful with {retry_info['name']}")
+                return True
+            else:
+                print(f"⚠️  Reconstruction quality insufficient, will retry with more lenient settings")
+
+        except Exception as e:
+            print(f"❌ COLMAP failed: {e}")
+            if attempt < len(retry_configs) - 1:
+                print("  Will retry with more lenient settings...")
+            continue
+
+    # All attempts failed - provide helpful error message
+    print(f"\n❌ COLMAP reconstruction failed after {len(retry_configs)} attempts")
+    print(f"   Total images: {total_images}, Required registered: {min_registered}")
+    print("\n💡 Suggestions:")
+    print("   1. The video may have insufficient camera movement or overlap")
+    print("   2. The scene may lack texture (smooth/reflective surfaces)")
+    print("   3. Try recording with slower camera movement")
+    print("   4. Ensure good lighting and avoid motion blur")
+    return False
+
+
 def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=False):
     """
     Process video(s) with uniform frame extraction and run COLMAP.
@@ -153,15 +322,20 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
         if existing_images:
             print(f"✅ Found {len(existing_images)} existing images in {images_dir}, skipping extraction")
 
-            # Check if COLMAP has already been run
-            if check_colmap_scene(output_path):
-                print(f"✅ COLMAP reconstruction already exists, skipping COLMAP stage")
+            # Calculate minimum required registered images
+            min_registered = get_min_registered_images(images_dir)
+
+            # Check if COLMAP has already been run AND has sufficient quality
+            if check_colmap_scene(output_path, min_registered_images=min_registered):
+                print(f"✅ COLMAP reconstruction already exists with sufficient registered images")
                 return output_path
             else:
                 print("🏗️  Running COLMAP reconstruction on existing images...")
-                run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
-                print(f"🎉 COLMAP processing complete!")
-                return output_path
+                if run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+                    print(f"🎉 COLMAP processing complete!")
+                    return output_path
+                else:
+                    raise RuntimeError("COLMAP reconstruction failed - see suggestions above")
 
     os.makedirs(images_dir, exist_ok=True)
 
@@ -260,9 +434,10 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
 
     print(f"\n✅ Total frames extracted: {len(all_frame_paths)}")
 
-    # Run COLMAP reconstruction
+    # Run COLMAP reconstruction with retry logic
     print("🏗️  Running COLMAP reconstruction...")
-    run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=colmap_cfg)
-
-    print(f"🎉 COLMAP processing complete!")
-    return output_path
+    if run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+        print(f"🎉 COLMAP processing complete!")
+        return output_path
+    else:
+        raise RuntimeError("COLMAP reconstruction failed - see suggestions above")
