@@ -287,9 +287,55 @@ source.corr_init.init_gaussians_with_corr(...)
 <a id="sec-tools"></a>
 ## 🛠️ Tools
 
+### Depth Image Renderer
+
+Renders depth images from a trained Gaussian Splatting model. Outputs both raw depth as `.npy` files and visualized depth as `.png` files.
+
+```bash
+python script/render_depth.py -m <model_path> -s <source_path> [options]
+```
+
+**Arguments:**
+- `-m, --model_path`: Path to the trained model directory (contains `cfg_args` and `point_cloud/`)
+- `-s, --source_path`: Path to the dataset (COLMAP scene with `cameras.bin/txt`)
+- `--iteration`: Iteration to load (default: -1 for latest)
+- `--skip_train`: Skip rendering train set
+- `--skip_test`: Skip rendering test set
+- `--ply_file`: Explicit path to `point_cloud.ply` (use with `--output_path`)
+- `--output_path`: Explicit output directory (use with `--ply_file`)
+
+**Output structure:**
+```
+<model_path>/
+  train/ours_<iteration>/
+    renders/      # RGB renderings (.png)
+    gt/           # Ground truth images (.png)
+    depth/        # Raw depth maps (.npy)
+    depth_vis/    # Visualized depth maps (.png)
+  test/ours_<iteration>/
+    ...
+```
+
+**Examples:**
+```bash
+# Standard mode (from trained model)
+python script/render_depth.py -m ./outputs/my_scene -s ./data/my_scene
+
+# Render specific iteration
+python script/render_depth.py -m ./outputs/my_scene -s ./data/my_scene --iteration 15000
+
+# Train set only
+python script/render_depth.py -m ./outputs/my_scene -s ./data/my_scene --skip_test
+
+# Explicit PLY mode (custom ply file)
+python script/render_depth.py -s ./data/my_scene --ply_file ./custom.ply --output_path ./renders/
+```
+
 ### Tree Diameter Estimator
 
 Estimates tree trunk diameters using depth images from Gaussian Splatting rendering, tree segmentation results (COCO format), and camera focal length.
+
+**Prerequisites:** Run `render_depth.py` first to generate depth images (see above).
 
 ```bash
 python script/tree_diameter_estimator.py <scene_path> [-o output.json] [-v] [--visualize DIR]
@@ -300,6 +346,9 @@ python script/tree_diameter_estimator.py <scene_path> [-o output.json] [-v] [--v
 - `-o, --output`: Output JSON file for results (optional)
 - `-v, --verbose`: Print detailed results
 - `--visualize DIR`: Output directory for visualization images with segmentation overlays and diameter annotations
+
+**Automatic depth directory selection:**
+When multiple training checkpoints exist (e.g., `train/ours_15000/`, `train/ours_30000/`), the script automatically selects the **highest numbered** `ours_*` directory based on alphabetical sorting. For example, if you have both `ours_15000` and `ours_30000`, it will use `train/ours_30000/depth/`.
 
 **Example:**
 ```bash
