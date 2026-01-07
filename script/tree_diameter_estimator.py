@@ -37,6 +37,9 @@ class TreeMeasurement:
     confidence: float
     bbox: tuple  # (x, y, width, height)
     measurement_height_ratio: float  # Where on the tree the measurement was taken (0=bottom, 1=top)
+    measurement_y: int = 0  # Y coordinate where trunk width was measured
+    measurement_left_x: int = 0  # Left X coordinate of segmentation at measurement Y
+    measurement_right_x: int = 0  # Right X coordinate of segmentation at measurement Y
 
 
 class TreeDiameterEstimator:
@@ -190,7 +193,7 @@ class TreeDiameterEstimator:
         mask: np.ndarray,
         bbox: tuple,
         measurement_ratio: float
-    ) -> tuple[float, int]:
+    ) -> tuple[float, int, int, int]:
         """
         Measure trunk width at a specific height ratio within the bounding box.
 
@@ -200,46 +203,48 @@ class TreeDiameterEstimator:
             measurement_ratio: Where to measure (0=top of bbox, 1=bottom)
 
         Returns:
-            (trunk_width_pixels, measurement_row)
+            (trunk_width_pixels, measurement_y, left_x, right_x)
         """
         x, y, w, h = [int(v) for v in bbox]
 
-        # Calculate measurement row (within the bounding box)
-        measurement_row = int(y + h * measurement_ratio)
-        measurement_row = min(measurement_row, mask.shape[0] - 1)
+        # Calculate Y coordinate for measurement (within the bounding box)
+        measurement_y = int(y + h * measurement_ratio)
+        measurement_y = min(measurement_y, mask.shape[0] - 1)
 
-        # Get the mask row and find the extent of the tree
-        row_mask = mask[measurement_row, :]
+        # Get the mask at measurement Y and find the extent of the tree
+        row_mask = mask[measurement_y, :]
 
         if row_mask.sum() == 0:
-            # No pixels at this row, search nearby rows
+            # No pixels at this Y, search nearby rows
             for offset in range(1, 20):
                 for direction in [-1, 1]:
-                    test_row = measurement_row + offset * direction
-                    if 0 <= test_row < mask.shape[0]:
-                        row_mask = mask[test_row, :]
+                    test_y = measurement_y + offset * direction
+                    if 0 <= test_y < mask.shape[0]:
+                        row_mask = mask[test_y, :]
                         if row_mask.sum() > 0:
-                            measurement_row = test_row
+                            measurement_y = test_y
                             break
                 if row_mask.sum() > 0:
                     break
 
         if row_mask.sum() == 0:
-            return 0.0, measurement_row
+            return 0.0, measurement_y, 0, 0
 
-        # Find leftmost and rightmost pixels
+        # Find leftmost and rightmost pixels from segmentation mask
         nonzero_cols = np.where(row_mask > 0)[0]
         if len(nonzero_cols) == 0:
-            return 0.0, measurement_row
+            return 0.0, measurement_y, 0, 0
 
-        trunk_width = nonzero_cols[-1] - nonzero_cols[0] + 1
-        return float(trunk_width), measurement_row
+        left_x = int(nonzero_cols[0])
+        right_x = int(nonzero_cols[-1])
+        trunk_width = right_x - left_x + 1
+        return float(trunk_width), measurement_y, left_x, right_x
 
     def _get_depth_at_region(
         self,
         depth_map: np.ndarray,
         mask: np.ndarray,
-        measurement_row: int,
+        measurement_y: int,
         trunk_width: float
     ) -> float:
         """
@@ -248,16 +253,16 @@ class TreeDiameterEstimator:
         Args:
             depth_map: Depth image
             mask: Binary segmentation mask
-            measurement_row: Row where trunk width was measured
+            measurement_y: Y coordinate where trunk width was measured
             trunk_width: Width of trunk in pixels
 
         Returns:
             Depth in meters (or the raw depth value if scale unknown)
         """
-        # Define a small region around the measurement row
-        row_range = 5  # +/- 5 rows
-        row_start = max(0, measurement_row - row_range)
-        row_end = min(depth_map.shape[0], measurement_row + row_range + 1)
+        # Define a small region around the measurement Y
+        row_range = 5  # +/- 5 pixels
+        row_start = max(0, measurement_y - row_range)
+        row_end = min(depth_map.shape[0], measurement_y + row_range + 1)
 
         # Get depth values within the mask region
         region_mask = mask[row_start:row_end, :]
@@ -392,8 +397,8 @@ class TreeDiameterEstimator:
                 img_height
             )
 
-            # Measure trunk width
-            trunk_width, measurement_row = self._measure_trunk_width(
+            # Measure trunk width from segmentation mask
+            trunk_width, measurement_y, left_x, right_x = self._measure_trunk_width(
                 mask, bbox, self.measurement_height_ratio
             )
 
@@ -401,7 +406,7 @@ class TreeDiameterEstimator:
                 continue
 
             # Get depth at measurement location
-            depth = self._get_depth_at_region(depth_map, mask, measurement_row, trunk_width)
+            depth = self._get_depth_at_region(depth_map, mask, measurement_y, trunk_width)
 
             if depth <= 0:
                 continue
@@ -424,6 +429,9 @@ class TreeDiameterEstimator:
                 confidence=confidence,
                 bbox=bbox,
                 measurement_height_ratio=self.measurement_height_ratio,
+                measurement_y=measurement_y,
+                measurement_left_x=left_x,
+                measurement_right_x=right_x,
             )
             measurements.append(measurement)
 
@@ -458,8 +466,8 @@ class TreeDiameterEstimator:
             cmin, cmax = np.where(cols)[0][[0, -1]]
             bbox = (cmin, rmin, cmax - cmin + 1, rmax - rmin + 1)
 
-        # Measure trunk width
-        trunk_width, measurement_row = self._measure_trunk_width(
+        # Measure trunk width from segmentation mask
+        trunk_width, measurement_y, _, _ = self._measure_trunk_width(
             segmentation_mask, bbox, self.measurement_height_ratio
         )
 
@@ -467,7 +475,7 @@ class TreeDiameterEstimator:
             return None
 
         # Get depth
-        depth = self._get_depth_at_region(depth_map, segmentation_mask, measurement_row, trunk_width)
+        depth = self._get_depth_at_region(depth_map, segmentation_mask, measurement_y, trunk_width)
 
         if depth <= 0:
             return None
@@ -636,21 +644,11 @@ class TreeDiameterEstimator:
         color: tuple,
     ):
         """Draw diameter annotation with arrow and text on image."""
-        bbox = measurement.bbox
-        x, y, w, h = [int(v) for v in bbox]
-
-        # Calculate measurement row position
-        measurement_row = int(y + h * measurement.measurement_height_ratio)
-
-        # Find the horizontal extent at measurement row
-        # Use bbox center as fallback
-        center_x = x + w // 2
-        half_width = int(measurement.trunk_width_pixels / 2)
-        left_x = center_x - half_width
-        right_x = center_x + half_width
-
-        # Draw horizontal double-arrow line
-        arrow_y = measurement_row
+        # Use actual segmentation positions stored in measurement
+        left_x = measurement.measurement_left_x
+        right_x = measurement.measurement_right_x
+        arrow_y = measurement.measurement_y
+        center_x = (left_x + right_x) // 2
         line_thickness = 2
         arrow_color = (255, 255, 255)  # White arrow
         outline_color = (0, 0, 0)  # Black outline
