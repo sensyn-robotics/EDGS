@@ -47,7 +47,7 @@ class TreeDiameterEstimator:
         scene_path/
             cameras.json              # Camera parameters with focal lengths
             train/ours_XXXXX/depth/   # Depth maps as .npy files
-            *_inferences.json         # Tree segmentation in COCO format
+            *.json                    # Tree segmentation in COCO format (auto-detected)
     """
 
     # Tree category IDs (from COCO format segmentation)
@@ -105,12 +105,37 @@ class TreeDiameterEstimator:
             cameras[img_name] = cam
         return cameras
 
+    def _is_coco_segmentation(self, file_path: Path) -> bool:
+        """Check if a JSON file is in COCO segmentation format."""
+        try:
+            with open(file_path) as f:
+                data = json.load(f)
+            # COCO format requires these keys with annotations containing segmentation
+            if not isinstance(data, dict):
+                return False
+            if not all(key in data for key in ['images', 'annotations', 'categories']):
+                return False
+            # Check that annotations have segmentation data
+            if data['annotations'] and 'segmentation' in data['annotations'][0]:
+                return True
+            return False
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+            return False
+
     def _find_segmentation_file(self) -> Path:
         """Find segmentation JSON file in the scene directory."""
+        # First, try files with 'inferences' in the name (legacy behavior)
         for f in self.scene_path.iterdir():
             if f.suffix == '.json' and 'inferences' in f.name.lower():
                 return f
-        raise FileNotFoundError(f"No segmentation file (*inferences.json) found in {self.scene_path}")
+
+        # Otherwise, check all JSON files for COCO segmentation format
+        for f in self.scene_path.iterdir():
+            if f.suffix == '.json' and f.name != 'cameras.json':
+                if self._is_coco_segmentation(f):
+                    return f
+
+        raise FileNotFoundError(f"No COCO segmentation JSON found in {self.scene_path}")
 
     def _load_segmentation(self) -> dict:
         """Load COCO-format segmentation data."""
