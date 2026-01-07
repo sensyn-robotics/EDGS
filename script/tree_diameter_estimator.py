@@ -303,18 +303,23 @@ class TreeDiameterEstimator:
     def _find_depth_file(self, image_name: str) -> Optional[Path]:
         """Find depth file corresponding to an image.
 
-        Depth files are numbered 00000.npy, 00001.npy, etc., corresponding
-        to the order of cameras in cameras.json.
+        Tries multiple naming conventions:
+        1. Image name without extension (e.g., 00000000.npy for 00000000.jpg)
+        2. Index-based 5-digit naming (e.g., 00000.npy for camera index 0)
         """
-        # Check if this image has a corresponding camera
-        if image_name not in self.camera_index:
-            return None
+        base_name = os.path.splitext(image_name)[0]
 
-        idx = self.camera_index[image_name]
-        depth_file = self.depth_dir / f"{idx:05d}.npy"
-
+        # Try 1: Direct image name match
+        depth_file = self.depth_dir / f"{base_name}.npy"
         if depth_file.exists():
             return depth_file
+
+        # Try 2: Index-based naming (for backwards compatibility)
+        if image_name in self.camera_index:
+            idx = self.camera_index[image_name]
+            depth_file = self.depth_dir / f"{idx:05d}.npy"
+            if depth_file.exists():
+                return depth_file
 
         return None
 
