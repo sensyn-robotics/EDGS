@@ -292,17 +292,22 @@ source.corr_init.init_gaussians_with_corr(...)
 Estimates tree trunk diameters using depth images from Gaussian Splatting rendering, tree segmentation results (COCO format), and camera focal length.
 
 ```bash
-python script/tree_diameter_estimator.py <scene_path> [-o output.json] [-v]
+python script/tree_diameter_estimator.py <scene_path> [-o output.json] [-v] [--visualize DIR]
 ```
 
 **Arguments:**
 - `scene_path`: Path to the scene directory containing `cameras.json`, depth maps, and segmentation data
 - `-o, --output`: Output JSON file for results (optional)
 - `-v, --verbose`: Print detailed results
+- `--visualize DIR`: Output directory for visualization images with segmentation overlays and diameter annotations
 
 **Example:**
 ```bash
+# Basic usage with verbose output
 python script/tree_diameter_estimator.py ./outputs/forest_scene -o measurements.json -v
+
+# Generate visualization images
+python script/tree_diameter_estimator.py ./outputs/forest_scene --visualize ./vis_output
 ```
 
 <a id="sec-citation"></a>

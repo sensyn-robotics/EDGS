@@ -475,6 +475,244 @@ class TreeDiameterEstimator:
         # Calculate diameter
         return trunk_width * depth / focal_length_pixels
 
+    def visualize_measurements(
+        self,
+        measurements: list[TreeMeasurement],
+        output_dir: str,
+        alpha: float = 0.4,
+    ) -> list[Path]:
+        """
+        Save visualization images with segmentation overlays and diameter annotations.
+
+        Args:
+            measurements: List of TreeMeasurement objects to visualize
+            output_dir: Directory to save output images
+            alpha: Transparency for segmentation overlay (0-1)
+
+        Returns:
+            List of paths to saved images
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+
+        # Group measurements by image
+        by_image: dict[int, list[TreeMeasurement]] = {}
+        for m in measurements:
+            if m.image_id not in by_image:
+                by_image[m.image_id] = []
+            by_image[m.image_id].append(m)
+
+        # Find images directory
+        images_dir = self._find_images_dir()
+
+        saved_files = []
+        # Color palette for different categories
+        colors = [
+            (0, 255, 0),    # Green
+            (255, 165, 0),  # Orange
+            (255, 0, 255),  # Magenta
+            (0, 255, 255),  # Cyan
+            (255, 255, 0),  # Yellow
+        ]
+
+        for image_id, image_measurements in by_image.items():
+            image_info = self.image_lookup.get(image_id)
+            if not image_info:
+                continue
+
+            image_name = image_info['file_name']
+            img_width = image_info['width']
+            img_height = image_info['height']
+
+            # Load original image
+            image_file = self._find_image_file(images_dir, image_name)
+            if image_file is None:
+                print(f"Warning: Could not find image {image_name}")
+                continue
+
+            img = cv2.imread(str(image_file))
+            if img is None:
+                print(f"Warning: Could not load image {image_file}")
+                continue
+
+            # Resize if needed
+            if img.shape[:2] != (img_height, img_width):
+                img = cv2.resize(img, (img_width, img_height))
+
+            # Create overlay for segmentation masks
+            overlay = img.copy()
+
+            for m in image_measurements:
+                # Get color based on category
+                color = colors[m.category_id % len(colors)]
+
+                # Find annotation to get segmentation polygon
+                annotation = self._find_annotation(m.tree_id)
+                if annotation is None:
+                    continue
+
+                # Draw segmentation mask
+                mask = self._polygon_to_mask(
+                    annotation['segmentation'],
+                    img_width,
+                    img_height
+                )
+                overlay[mask > 0] = color
+
+            # Blend overlay with original
+            img = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+
+            # Draw diameter annotations
+            for m in image_measurements:
+                color = colors[m.category_id % len(colors)]
+                self._draw_diameter_annotation(img, m, color)
+
+            # Save image
+            output_file = output_path / f"vis_{Path(image_name).stem}.jpg"
+            cv2.imwrite(str(output_file), img, [cv2.IMWRITE_JPEG_QUALITY, 95])
+            saved_files.append(output_file)
+
+        return saved_files
+
+    def _find_images_dir(self) -> Path:
+        """Find directory containing original images."""
+        # Try common locations
+        candidates = [
+            self.scene_path / "images",
+            self.scene_path / "train" / "ours_30000" / "gt",
+            self.scene_path / "train" / "ours_15000" / "gt",
+        ]
+
+        # Also check for any ours_* directories
+        train_dir = self.scene_path / "train"
+        if train_dir.exists():
+            for d in sorted(train_dir.iterdir(), reverse=True):
+                if d.name.startswith("ours_"):
+                    gt_dir = d / "gt"
+                    if gt_dir.exists():
+                        candidates.insert(0, gt_dir)
+
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+
+        raise FileNotFoundError(f"Could not find images directory in {self.scene_path}")
+
+    def _find_image_file(self, images_dir: Path, image_name: str) -> Optional[Path]:
+        """Find image file, handling different naming conventions."""
+        # Direct match
+        direct = images_dir / image_name
+        if direct.exists():
+            return direct
+
+        # Try with different extensions
+        stem = Path(image_name).stem
+        for ext in ['.jpg', '.jpeg', '.png', '.JPG', '.JPEG', '.PNG']:
+            candidate = images_dir / f"{stem}{ext}"
+            if candidate.exists():
+                return candidate
+
+        # Try numbered format (00000.png, etc.)
+        if image_name in self.camera_index:
+            idx = self.camera_index[image_name]
+            for ext in ['.png', '.jpg', '.jpeg']:
+                candidate = images_dir / f"{idx:05d}{ext}"
+                if candidate.exists():
+                    return candidate
+
+        return None
+
+    def _find_annotation(self, tree_id: int) -> Optional[dict]:
+        """Find annotation by tree ID."""
+        for ann in self.segmentation['annotations']:
+            if ann['id'] == tree_id:
+                return ann
+        return None
+
+    def _draw_diameter_annotation(
+        self,
+        img: np.ndarray,
+        measurement: TreeMeasurement,
+        color: tuple,
+    ):
+        """Draw diameter annotation with arrow and text on image."""
+        bbox = measurement.bbox
+        x, y, w, h = [int(v) for v in bbox]
+
+        # Calculate measurement row position
+        measurement_row = int(y + h * measurement.measurement_height_ratio)
+
+        # Find the horizontal extent at measurement row
+        # Use bbox center as fallback
+        center_x = x + w // 2
+        half_width = int(measurement.trunk_width_pixels / 2)
+        left_x = center_x - half_width
+        right_x = center_x + half_width
+
+        # Draw horizontal double-arrow line
+        arrow_y = measurement_row
+        line_thickness = 2
+        arrow_color = (255, 255, 255)  # White arrow
+        outline_color = (0, 0, 0)  # Black outline
+
+        # Draw outline first (thicker)
+        cv2.line(img, (left_x, arrow_y), (right_x, arrow_y), outline_color, line_thickness + 2)
+
+        # Draw arrow line
+        cv2.line(img, (left_x, arrow_y), (right_x, arrow_y), arrow_color, line_thickness)
+
+        # Draw arrow heads (<->)
+        arrow_head_len = 8
+        # Left arrow head
+        cv2.line(img, (left_x, arrow_y), (left_x + arrow_head_len, arrow_y - arrow_head_len),
+                 outline_color, line_thickness + 2)
+        cv2.line(img, (left_x, arrow_y), (left_x + arrow_head_len, arrow_y + arrow_head_len),
+                 outline_color, line_thickness + 2)
+        cv2.line(img, (left_x, arrow_y), (left_x + arrow_head_len, arrow_y - arrow_head_len),
+                 arrow_color, line_thickness)
+        cv2.line(img, (left_x, arrow_y), (left_x + arrow_head_len, arrow_y + arrow_head_len),
+                 arrow_color, line_thickness)
+        # Right arrow head
+        cv2.line(img, (right_x, arrow_y), (right_x - arrow_head_len, arrow_y - arrow_head_len),
+                 outline_color, line_thickness + 2)
+        cv2.line(img, (right_x, arrow_y), (right_x - arrow_head_len, arrow_y + arrow_head_len),
+                 outline_color, line_thickness + 2)
+        cv2.line(img, (right_x, arrow_y), (right_x - arrow_head_len, arrow_y - arrow_head_len),
+                 arrow_color, line_thickness)
+        cv2.line(img, (right_x, arrow_y), (right_x - arrow_head_len, arrow_y + arrow_head_len),
+                 arrow_color, line_thickness)
+
+        # Draw diameter text
+        diameter_text = f"{measurement.diameter_meters:.2f}m"
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        font_scale = 0.7
+        font_thickness = 2
+
+        # Get text size for positioning
+        (text_w, text_h), baseline = cv2.getTextSize(diameter_text, font, font_scale, font_thickness)
+
+        # Position text above the arrow, centered
+        text_x = center_x - text_w // 2
+        text_y = arrow_y - 10
+
+        # Ensure text is within image bounds
+        text_x = max(5, min(text_x, img.shape[1] - text_w - 5))
+        text_y = max(text_h + 5, text_y)
+
+        # Draw text background for better visibility
+        padding = 3
+        cv2.rectangle(
+            img,
+            (text_x - padding, text_y - text_h - padding),
+            (text_x + text_w + padding, text_y + baseline + padding),
+            (0, 0, 0),
+            -1
+        )
+
+        # Draw text with outline for visibility
+        cv2.putText(img, diameter_text, (text_x, text_y), font, font_scale, (0, 0, 0), font_thickness + 2)
+        cv2.putText(img, diameter_text, (text_x, text_y), font, font_scale, (255, 255, 255), font_thickness)
+
 
 def estimate_tree_diameters(
     scene_path: str,
@@ -551,15 +789,48 @@ if __name__ == "__main__":
         action="store_true",
         help="Print detailed results"
     )
+    parser.add_argument(
+        "--visualize",
+        "--vis",
+        metavar="DIR",
+        help="Output directory for visualization images"
+    )
 
     args = parser.parse_args()
 
-    measurements = estimate_tree_diameters(
+    estimator = TreeDiameterEstimator(
         scene_path=args.scene_path,
-        output_file=args.output,
         measurement_height_ratio=args.height_ratio,
-        min_confidence=args.min_confidence,
     )
+
+    measurements = estimator.estimate_diameters(min_confidence=args.min_confidence)
+
+    # Save JSON output if requested
+    if args.output:
+        results = []
+        for m in measurements:
+            results.append({
+                'tree_id': m.tree_id,
+                'image_id': m.image_id,
+                'image_name': m.image_name,
+                'category_id': m.category_id,
+                'category_name': m.category_name,
+                'trunk_width_pixels': m.trunk_width_pixels,
+                'depth_meters': m.depth_meters,
+                'focal_length_pixels': m.focal_length_pixels,
+                'diameter_meters': m.diameter_meters,
+                'confidence': m.confidence,
+                'bbox': list(m.bbox),
+                'measurement_height_ratio': m.measurement_height_ratio,
+            })
+        with open(args.output, 'w') as f:
+            json.dump(results, f, indent=2)
+        print(f"Saved {len(results)} measurements to {args.output}")
+
+    # Generate visualization if requested
+    if args.visualize:
+        saved_files = estimator.visualize_measurements(measurements, args.visualize)
+        print(f"Saved {len(saved_files)} visualization images to {args.visualize}")
 
     # Print summary
     print(f"\nProcessed {len(measurements)} tree measurements")
