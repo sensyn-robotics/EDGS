@@ -564,12 +564,12 @@ class TreeDiameterEstimator:
             # Load original image
             image_file = self._find_image_file(images_dir, image_name)
             if image_file is None:
-                print(f"Warning: Could not find image {image_name}")
+                logger.warning(f"Could not find image {image_name}")
                 continue
 
             img = cv2.imread(str(image_file))
             if img is None:
-                print(f"Warning: Could not load image {image_file}")
+                logger.warning(f"Could not load image {image_file}")
                 continue
 
             # Resize if needed
@@ -787,7 +787,7 @@ def estimate_tree_diameters(
 
         with open(output_file, 'w') as f:
             json.dump(results, f, indent=2)
-        print(f"Saved {len(results)} measurements to {output_file}")
+        logger.info(f"Saved {len(results)} measurements to {output_file}")
 
     return measurements
 
