@@ -13,6 +13,7 @@ Formula: tree_diameter = tree_width_pix * depth_m / focal_length_pix
 """
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,13 @@ from typing import Optional
 
 import cv2
 import numpy as np
+
+# Set up logging to file
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+_log_handler = logging.FileHandler("tree_diameter_estimator.log")
+_log_handler.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+logger.addHandler(_log_handler)
 
 
 @dataclass
@@ -408,17 +416,33 @@ class TreeDiameterEstimator:
             )
 
             if trunk_width <= 0:
+                logger.warning(
+                    f"Skipping tree {annotation['id']} in {image_name}: "
+                    f"trunk_width={trunk_width} <= 0 (bbox={bbox}, y={measurement_y})"
+                )
                 continue
 
             # Get depth at measurement location
             depth = self._get_depth_at_region(depth_map, mask, measurement_y, trunk_width)
 
             if depth <= 0:
+                logger.warning(
+                    f"Skipping tree {annotation['id']} in {image_name}: "
+                    f"depth={depth} <= 0 (trunk_width={trunk_width}px, y={measurement_y})"
+                )
                 continue
 
             # Calculate diameter using the formula
             # diameter = trunk_width_pix * depth_m / focal_length_pix
             diameter = trunk_width * depth / focal_length
+
+            # Warn if diameter is very small (would display as 0.00m)
+            if diameter < 0.01:
+                logger.warning(
+                    f"Small diameter for tree {annotation['id']} in {image_name}: "
+                    f"diameter={diameter:.6f}m, trunk_width={trunk_width:.1f}px, "
+                    f"depth={depth:.4f}m, focal_length={focal_length:.1f}px"
+                )
 
             # Create measurement result
             measurement = TreeMeasurement(
