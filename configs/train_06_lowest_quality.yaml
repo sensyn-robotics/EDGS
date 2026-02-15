@@ -9,7 +9,7 @@ defaults:
 # EDGS core with absolute minimal memory
 train:
   no_densify: True  # Essential EDGS principle - no densification
-  gs_epochs: 300  # Further reduced iterations
+  gs_epochs: 30000  # Standard iterations for proper convergence
   reduce_opacity: True  # Enable opacity reduction
   max_lr: True  # Use max learning rate for faster convergence
 
@@ -27,7 +27,7 @@ gs:
     position_lr_init: 0.00008      # Very low for stability
     position_lr_final: 0.0000008   # Proportionally lower
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 15000
+    position_lr_max_steps: 30000
     
     # Minimal learning rates for stability
     feature_lr: 0.001     # Very conservative

@@ -1,0 +1,36 @@
+defaults:
+  - gs: base
+  - _self_
+
+seed: 228
+
+wandb:
+  mode: "disabled"
+  entity: "3dcorrespondence"
+  project: "Adv3DGS"
+  group: null
+  name: null
+  tag: "debug"
+
+train:
+  gs_epochs: 30000
+  reduce_opacity: True
+  no_densify: False
+  max_lr: True
+
+load:
+  gs: null
+  gs_step: null
+
+device: "cuda:0"
+verbose: true
+
+init_wC:
+  use: True
+  matches_per_ref: 12000
+  num_refs: 180
+  nns_per_ref: 3
+  scaling_factor: 0.001
+  proj_err_tolerance: 0.01
+  roma_model: "outdoors"
+  add_SfM_init: False
