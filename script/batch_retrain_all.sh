@@ -20,7 +20,8 @@ log() {
 
 get_psnr() {
     local log="$1"
-    grep -E "ITER (29|30)000.*test.*PSNR" "$log" 2>/dev/null | tail -1 | grep -oP "PSNR=\K[0-9.]+" || echo "0"
+    # Get the last test PSNR evaluation (evaluations happen at non-round iterations like 29228)
+    grep -E "Evaluating test:.*PSNR=" "$log" 2>/dev/null | tail -1 | grep -oP "PSNR=\K[0-9.]+" || echo "0"
 }
 
 get_ply_size() {
