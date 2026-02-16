@@ -2,7 +2,6 @@
 # Batch retrain all scenes until PSNR > 20
 # This script processes scenes sequentially, retrying each until success
 
-set -e
 cd /home/mas/proj/sensyn/EDGS
 
 LOG_DIR="outputs/20260121_otowa"
@@ -52,6 +51,8 @@ train_scene() {
 
     local attempt=0
     local config_idx=0
+    local prev_config=""
+    local prev_colmap=""
 
     while [ $attempt -lt $max_attempts ]; do
         attempt=$((attempt + 1))
@@ -59,7 +60,26 @@ train_scene() {
         local colmap_config="${COLMAP_CONFIGS[$config_idx]}"
         local train_log="${LOG_DIR}/${scene_name}_attempt${attempt}.log"
 
-        log "Attempt $attempt: config=$config, colmap=$colmap_config"
+        # Show what changed from previous attempt
+        if [ -z "$prev_config" ]; then
+            log "Attempt $attempt/$max_attempts: config=$config, colmap=$colmap_config"
+        else
+            local config_change=""
+            local colmap_change=""
+            if [ "$config" != "$prev_config" ]; then
+                config_change="$prev_config -> $config"
+            else
+                config_change="$config (unchanged)"
+            fi
+            if [ "$colmap_config" != "$prev_colmap" ]; then
+                colmap_change="$prev_colmap -> $colmap_config"
+            else
+                colmap_change="$colmap_config (unchanged)"
+            fi
+            log "Attempt $attempt/$max_attempts: config=$config_change, colmap=$colmap_change"
+        fi
+        prev_config="$config"
+        prev_colmap="$colmap_config"
 
         # Clean previous artifacts
         rm -rf "$output/point_cloud" "$output/chkpnt"* "$output/input.ply" "$output/cameras.json" 2>/dev/null || true
@@ -115,7 +135,7 @@ train_scene() {
         fi
     done
 
-    log "FAILED: $scene_name after $max_attempts attempts"
+    log "FAILED: $scene_name after $max_attempts attempts - SKIPPING to next scene"
     return 1
 }
 
@@ -143,23 +163,23 @@ log "2-1 current PSNR: $PSNR_2_1"
 if [ -z "$PSNR_2_1" ] || [ "$PSNR_2_1" = "0" ] || [ $(echo "$PSNR_2_1 < $MIN_PSNR" | bc -l) = "1" ]; then
     train_scene "data/20260121_otowa/2-1.細めの1本（No.47）を離隔1~2mで一周_VID_20260121_115814_00_079.mp4" \
                 "outputs/20260121_otowa/2-1.細めの1本（No.47）を離隔1~2mで一周_VID_20260121_115814_00_079" \
-                "2-1"
+                "2-1" || true
 fi
 
 # 1_1
 train_scene "data/20260121_otowa/1_1.太めの1本（No.41）を離隔2mで一周_VID_20260121_120105_00_081.mp4" \
             "outputs/20260121_otowa/1_1.太めの1本（No.41）を離隔2mで一周_VID_20260121_120105_00_081" \
-            "1_1"
+            "1_1" || true
 
 # 3-1
 train_scene "data/20260121_otowa/3-1.細めの4本(No.43-46)を離隔1mで一周_VID_20260121_114759_00_077.mp4" \
             "outputs/20260121_otowa/3-1.細めの4本(No.43-46)を離隔1mで一周_VID_20260121_114759_00_077" \
-            "3-1"
+            "3-1" || true
 
 # 4
 train_scene "data/20260121_otowa/4.検証エリア全体（約20本）を運用を想定したジグザグ移動で撮影_VID_20260121_114006_00_074.mp4" \
             "outputs/20260121_otowa/4.検証エリア全体（約20本）を運用を想定したジグザグ移動で撮影_VID_20260121_114006_00_074" \
-            "4"
+            "4" || true
 
 log "=========================================="
 log "BATCH COMPLETE"
