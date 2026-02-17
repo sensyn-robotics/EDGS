@@ -2,10 +2,15 @@
 # coding: utf-8
 
 """
-Convert equirectangular 360° images to cubemap faces.
+Convert equirectangular 360° images to perspective views.
 
 This module provides functionality to convert 360 degree equirectangular images
-into cubemap face projections using ffmpeg's v360 filter.
+into 13 perspective images using ffmpeg's v360 filter:
+- 5 cube face centers (front, right, back, left, top - excluding bottom)
+- 8 vertex-centered views pointing at cube corners
+
+The combined approach provides maximum overlap between views, which helps with
+feature matching and 3DGS convergence.
 """
 
 import argparse
@@ -18,31 +23,45 @@ import tempfile
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'}
 
 
-def convert_equirectangular_to_cubemap(input_image_path, output_dir):
+def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90):
     """
-    Convert an equirectangular 360 image to 5 cubemap face images.
+    Convert an equirectangular 360 image to 13 perspective images.
 
-    Note: Bottom face is excluded to avoid capturing the camera operator.
+    Generates 5 cube face views (excluding bottom) + 8 vertex-centered views
+    for maximum overlap, which helps with feature matching and 3DGS convergence.
 
     Args:
         input_image_path: Path to equirectangular image
-        output_dir: Directory to save cubemap face images
+        output_dir: Directory to save output images
+        fov: Field of view in degrees (default 90)
 
     Returns:
-        List of paths to the 5 generated cubemap face images (front, right, back, left, top)
+        List of paths to the 13 generated images
     """
     os.makedirs(output_dir, exist_ok=True)
     basename = os.path.splitext(os.path.basename(input_image_path))[0]
 
-    # Define the 5 cubemap faces with their respective ffmpeg parameters
+    # Vertex pitch angles: arcsin(1/√3) ≈ 35.264°
+    pitch_up = 35.264
+    pitch_down = -35.264
+
     # Format: (suffix, yaw, pitch, roll)
-    # Note: Bottom face is excluded as it often captures the camera operator
     faces = [
-        ("front", 0, 0, 0),      # Front face
-        ("right", -90, 0, 0),    # Right face
-        ("back", 180, 0, 0),     # Back face
-        ("left", 90, 0, 0),      # Left face
-        ("top", 0, 90, 0),       # Top face (pitch=90 looks up)
+        # 5 cube face centers (excluding bottom)
+        ("front", 0, 0, 0),
+        ("right", -90, 0, 0),
+        ("back", 180, 0, 0),
+        ("left", 90, 0, 0),
+        ("top", 0, 90, 0),
+        # 8 vertex-centered views (upper 4 + lower 4)
+        ("front_right_top", -45, pitch_up, 0),
+        ("front_left_top", 45, pitch_up, 0),
+        ("back_right_top", -135, pitch_up, 0),
+        ("back_left_top", 135, pitch_up, 0),
+        ("front_right_bottom", -45, pitch_down, 0),
+        ("front_left_bottom", 45, pitch_down, 0),
+        ("back_right_bottom", -135, pitch_down, 0),
+        ("back_left_bottom", 135, pitch_down, 0),
     ]
 
     output_paths = []
@@ -52,11 +71,11 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir):
 
         # Build ffmpeg command for v360 filter
         # e:rectilinear converts equirectangular to rectilinear projection
-        # h_fov and v_fov set the field of view to 90 degrees for cube face
+        # Using wider FOV (default 110°) for more overlap between views
         cmd = [
             "ffmpeg",
             "-i", input_image_path,
-            "-vf", f"v360=e:rectilinear:h_fov=90:v_fov=90:yaw={yaw}:pitch={pitch}:roll={roll}",
+            "-vf", f"v360=e:rectilinear:h_fov={fov}:v_fov={fov}:yaw={yaw}:pitch={pitch}:roll={roll}",
             "-y",  # Overwrite output files
             output_path
         ]
@@ -72,9 +91,9 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir):
 
 
 def main():
-    """Command-line interface for converting equirectangular images to cubemap."""
+    """Command-line interface for converting equirectangular images to perspective views."""
     parser = argparse.ArgumentParser(
-        description="Convert 360° equirectangular images/videos to cubemap faces."
+        description="Convert 360° equirectangular images/videos to 13 perspective views (5 faces + 8 vertices)."
     )
     parser.add_argument(
         "input",
@@ -97,6 +116,13 @@ def main():
         metavar="FPS",
         default=1.0,
         help="For video input: extract frames at this rate (frames per second). Default: 1.0"
+    )
+    parser.add_argument(
+        "--fov",
+        type=float,
+        metavar="DEGREES",
+        default=110,
+        help="Field of view in degrees for each view. Higher = more overlap. Default: 110"
     )
 
     args = parser.parse_args()
@@ -191,9 +217,9 @@ def main():
             try:
                 subprocess.run(cmd, check=True, capture_output=True, text=True)
 
-                # Convert this frame to cubemap
+                # Convert this frame to vertex-centered views
                 frame_output_dir = os.path.join(output_dir, f"frame_{frame_idx:04d}")
-                cubemap_faces = convert_equirectangular_to_cubemap(frame_path, frame_output_dir)
+                cubemap_faces = convert_equirectangular_to_cubemap(frame_path, frame_output_dir, fov=args.fov)
                 all_cubemap_faces.extend(cubemap_faces)
 
                 print(f"   ✅ Frame {frame_idx+1}/{num_frames} converted")
@@ -206,19 +232,19 @@ def main():
         shutil.rmtree(temp_dir)
 
         print()
-        print(f"✅ Successfully generated {len(all_cubemap_faces)} cubemap faces from {num_frames} frames")
+        print(f"✅ Successfully generated {len(all_cubemap_faces)} vertex-centered views from {num_frames} frames")
         return 0
 
-    # Convert to cubemap (for single image or single frame from video)
-    print("🌐 Converting equirectangular image to cubemap faces...")
+    # Convert to perspective views (for single image or single frame from video)
+    print("🌐 Converting equirectangular image to 13 views (5 faces + 8 vertices)...")
     print(f"   Input: {os.path.basename(input_path)}")
     print(f"   Output: {output_dir}")
     print()
 
     try:
-        cubemap_faces = convert_equirectangular_to_cubemap(input_path, output_dir)
+        cubemap_faces = convert_equirectangular_to_cubemap(input_path, output_dir, fov=args.fov)
 
-        print(f"✅ Successfully generated {len(cubemap_faces)} cubemap faces:")
+        print(f"✅ Successfully generated {len(cubemap_faces)} vertex-centered views:")
         for face in cubemap_faces:
             print(f"   - {os.path.basename(face)}")
 
