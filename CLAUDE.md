@@ -83,27 +83,11 @@ python script/gradio_demo.py --port 7862
 jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root --notebook-dir=notebooks
 ```
 
-### Memory-Optimized Training Scripts
+### Batch Training with tmux
 
-For different GPU memory constraints:
+The main entry point for training is `train_tmux.sh`, which handles tmux session management:
 ```bash
-# Highest quality (16GB+ GPU)
-./script/run_docker_01_highest_quality.sh <colmap_path> <output_path>
-
-# High quality (12GB+ GPU)  
-./script/run_docker_02_high_quality.sh <colmap_path> <output_path>
-
-# Optimal quality (10GB+ GPU)
-./script/run_docker_03_optimal_quality.sh <colmap_path> <output_path>
-
-# Medium quality (8GB+ GPU)
-./script/run_docker_04_medium_quality.sh <colmap_path> <output_path>
-
-# Low quality (6GB+ GPU)
-./script/run_docker_05_low_quality.sh <colmap_path> <output_path>
-
-# Lowest quality (4GB+ GPU)
-./script/run_docker_06_lowest_quality.sh <colmap_path> <output_path>
+./script/train_tmux.sh --input <video.mp4> --output_path <output_dir> [--config train_03_optimal_quality] [--colmap_config colmap_03_optimal_quality]
 ```
 
 ### Evaluation
@@ -130,9 +114,10 @@ python script/full_eval.py -m360 <mipnerf360_folder> -tat <tanks_temples_folder>
 - Base GS config: `gs/base.yaml`
 
 **Scripts (`script/`):**
-- `train.py`: Main training entry point
+- `train_tmux.sh`: Main entry point for batch training with tmux session management
+- `train.py`: Core training script (called by train_tmux.sh)
 - `fit_model_to_scene_full.py`: End-to-end pipeline from video/images to 3D model
-- `run_docker_*.sh`: Memory-optimized training launchers
+- `quick_eval.py`: Quick PSNR/SSIM/LPIPS evaluation for trained models
 - `gradio_demo.py`: Interactive web interface
 
 ### Key Processing Flow
