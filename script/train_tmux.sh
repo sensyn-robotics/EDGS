@@ -45,8 +45,8 @@ MONITOR_LOG="${LOG_DIR}/${SCENE_NAME}_monitor_${TIMESTAMP}.log"
 mkdir -p "$LOG_DIR"
 
 # Config progression for retries (start with highest quality, reduce on failure)
-CONFIGS=("train" "train_medium" "train_large" "train_xlarge")
-COLMAP_CONFIGS=("colmap_05_low_quality" "colmap_05_low_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
+CONFIGS=("train_large" "train_xlarge" "train_xlarge" "train_xlarge")
+COLMAP_CONFIGS=("colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
 
 # Kill existing session if running
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -84,8 +84,8 @@ PROJECT_DIR="/home/mas/proj/sensyn/EDGS"
 cd "$PROJECT_DIR"
 
 # Config arrays
-CONFIGS=("train" "train_medium" "train_large" "train_xlarge")
-COLMAP_CONFIGS=("colmap_05_low_quality" "colmap_05_low_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
+CONFIGS=("train_large" "train_xlarge" "train_xlarge" "train_xlarge")
+COLMAP_CONFIGS=("colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
 
 get_psnr() {
     local log="$1"

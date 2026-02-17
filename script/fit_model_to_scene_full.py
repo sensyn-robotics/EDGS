@@ -333,6 +333,12 @@ def parse_arguments():
         action="store_true",
         help="Process 360 degree equirectangular video by converting to cubemap faces.",
     )
+    parser.add_argument(
+        "--fov-360",
+        type=float,
+        default=90,
+        help="Field of view for 360 perspective conversion (default 90°, lower = less overlap).",
+    )
     return parser.parse_args()
 
 
@@ -395,11 +401,13 @@ def prepare_scene_directory(args, colmap_cfg):
             is_360_mode = getattr(args, '360', False)
             if is_360_mode:
                 print("🌐 360 degree video mode enabled")
+            fov_360 = getattr(args, 'fov_360', 90)
             scene_dir = process_video_to_colmap_scene(
                 video_path=args.input,
                 output_path=os.path.join(base_output_path, "video_scene"),
                 colmap_cfg=colmap_cfg,
-                is_360=is_360_mode
+                is_360=is_360_mode,
+                fov_360=fov_360
             )
             return scene_dir
 
@@ -415,11 +423,13 @@ def prepare_scene_directory(args, colmap_cfg):
         is_360_mode = getattr(args, '360', False)
         if is_360_mode:
             print("🌐 360 degree video mode enabled")
+        fov_360 = getattr(args, 'fov_360', 90)
         scene_dir = process_video_to_colmap_scene(
             video_path=args.input,
             output_path=os.path.join(base_output_path, "video_scene"),
             colmap_cfg=colmap_cfg,
-            is_360=is_360_mode
+            is_360=is_360_mode,
+            fov_360=fov_360
         )
         return scene_dir
 

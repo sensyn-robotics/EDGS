@@ -283,7 +283,7 @@ def run_colmap_with_retry(output_path, colmap_cfg, images_dir):
     return False
 
 
-def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=False):
+def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=False, fov_360=90):
     """
     Process video(s) with uniform frame extraction and run COLMAP.
 
@@ -292,6 +292,7 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
         output_path: Directory to save COLMAP scene
         colmap_cfg: COLMAP configuration dictionary with preprocessing settings
         is_360: If True, process as 360 degree equirectangular video
+        fov_360: Field of view for 360 perspective conversion (default 90°, lower = less overlap)
 
     Returns:
         scene_dir: Path to COLMAP scene directory
@@ -394,8 +395,8 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
                 os.makedirs(cubemap_temp_dir, exist_ok=True)
 
                 for frame_path in frame_paths:
-                    # Convert each equirectangular frame to 6 cubemap faces
-                    cubemap_faces = convert_equirectangular_to_cubemap(frame_path, cubemap_temp_dir)
+                    # Convert each equirectangular frame to perspective views
+                    cubemap_faces = convert_equirectangular_to_cubemap(frame_path, cubemap_temp_dir, fov=fov_360)
 
                     # Move cubemap faces to combined directory with global numbering
                     for face_path in cubemap_faces:
