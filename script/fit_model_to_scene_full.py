@@ -325,8 +325,9 @@ def parse_arguments():
         type=str,
         default="colmap_03_optimal_quality",
         choices=["colmap_01_highest_quality", "colmap_02_high_quality", "colmap_03_optimal_quality",
-                 "colmap_04_medium_quality", "colmap_05_low_quality", "colmap_06_lowest_quality"],
-        help="COLMAP configuration profile (01=highest to 06=lowest quality).",
+                 "colmap_04_medium_quality", "colmap_05_low_quality", "colmap_06_lowest_quality",
+                 "colmap_07_360_optimized"],
+        help="COLMAP configuration profile (01=highest to 06=lowest quality, 07=360 optimized).",
     )
     parser.add_argument(
         "--360",
@@ -491,12 +492,22 @@ def main():
     """Main function to orchestrate the EDGS training pipeline."""
     # Parse arguments
     args = parse_arguments()
-    
+
+    # Auto-select 360-optimized config when --360 mode is enabled
+    is_360_mode = getattr(args, '360', False)
+    colmap_config_name = args.colmap_config
+    if is_360_mode and colmap_config_name == "colmap_03_optimal_quality":
+        # Use 360-optimized config as default for 360 mode
+        colmap_config_name = "colmap_07_360_optimized"
+        print("🌐 360 mode detected - using colmap_07_360_optimized config")
+
     # Load COLMAP configuration
-    colmap_cfg = load_colmap_config(args.colmap_config)
-    print(f"\n📋 Using COLMAP config: {args.colmap_config}")
+    colmap_cfg = load_colmap_config(colmap_config_name)
+    print(f"\n📋 Using COLMAP config: {colmap_config_name}")
     print(f"  - Target FPS: {colmap_cfg.get('preprocessing', {}).get('target_fps', 3.0)}")
     print(f"  - Max image size: {colmap_cfg.get('preprocessing', {}).get('max_image_size', -1)}")
+    if is_360_mode:
+        print(f"  - Single camera mode: {colmap_cfg.get('processing_360', {}).get('single_camera', False)}")
     
     # Initialize Hydra configuration
     with initialize(config_path="../configs", version_base="1.1"):

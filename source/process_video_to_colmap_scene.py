@@ -17,6 +17,14 @@ import cv2
 from source.utils_preprocess import run_colmap_on_scene
 from source.convert_equirectangular_to_cubemap import convert_equirectangular_to_cubemap
 
+# Face order for grouping 360 images by view direction
+# This ensures sequential matching works well: all fronts → all rights → all backs → etc.
+FACE_ORDER = [
+    "front", "right", "back", "left", "top",
+    "front_right_top", "front_left_top", "back_right_top", "back_left_top",
+    "front_right_bottom", "front_left_bottom", "back_right_bottom", "back_left_bottom"
+]
+
 
 def check_colmap_scene(directory_path, min_registered_images=2):
     """
@@ -151,7 +159,7 @@ def get_min_registered_images(images_dir):
     return max(2, int(total_images * 0.3))
 
 
-def run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+def run_colmap_with_retry(output_path, colmap_cfg, images_dir, single_camera=False):
     """
     Run COLMAP with retry logic using progressively more lenient settings.
 
@@ -159,6 +167,7 @@ def run_colmap_with_retry(output_path, colmap_cfg, images_dir):
         output_path: Directory containing images and where COLMAP output goes
         colmap_cfg: COLMAP configuration dictionary
         images_dir: Directory containing images
+        single_camera: If True, force all images to share the same camera intrinsics
 
     Returns:
         bool: True if reconstruction was successful
@@ -257,7 +266,8 @@ def run_colmap_with_retry(output_path, colmap_cfg, images_dir):
             print("  🗑️  Cleared previous reconstruction data")
 
         try:
-            run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=retry_info['config'])
+            run_colmap_on_scene(output_path, force_pinhole=True, colmap_config=retry_info['config'],
+                              single_camera=single_camera)
 
             # Check if reconstruction was successful
             if check_colmap_scene(output_path, min_registered_images=min_registered):
@@ -332,7 +342,7 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
                 return output_path
             else:
                 print("🏗️  Running COLMAP reconstruction on existing images...")
-                if run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+                if run_colmap_with_retry(output_path, colmap_cfg, images_dir, single_camera=is_360):
                     print(f"🎉 COLMAP processing complete!")
                     return output_path
                 else:
@@ -394,12 +404,24 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
                 cubemap_temp_dir = os.path.join(output_path, f"temp_cubemap_{idx}")
                 os.makedirs(cubemap_temp_dir, exist_ok=True)
 
+                # Collect faces by direction for proper ordering
+                faces_by_direction = {face: [] for face in FACE_ORDER}
+
                 for frame_path in frame_paths:
                     # Convert each equirectangular frame to perspective views
+                    # Returns dict: {face_name: face_path}
                     cubemap_faces = convert_equirectangular_to_cubemap(frame_path, cubemap_temp_dir, fov=fov_360)
 
-                    # Move cubemap faces to combined directory with global numbering
-                    for face_path in cubemap_faces:
+                    # Collect faces by direction
+                    for face_name, face_path in cubemap_faces.items():
+                        if face_name in faces_by_direction:
+                            faces_by_direction[face_name].append(face_path)
+
+                # Renumber images by direction: all fronts → all rights → all backs → etc.
+                # This grouping improves sequential matching in COLMAP
+                print(f"  📋 Reordering images by view direction for better matching...")
+                for face_name in FACE_ORDER:
+                    for face_path in faces_by_direction[face_name]:
                         new_filename = f"{frame_counter:08d}.png"
                         new_path = os.path.join(images_dir, new_filename)
                         shutil.move(face_path, new_path)
@@ -410,7 +432,8 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
                 if os.path.exists(cubemap_temp_dir):
                     shutil.rmtree(cubemap_temp_dir)
 
-                print(f"  ✅ Converted {len(frame_paths)} frames to {len(frame_paths) * 5} cubemap faces (excluding bottom)")
+                total_faces = sum(len(faces) for faces in faces_by_direction.values())
+                print(f"  ✅ Converted {len(frame_paths)} frames to {total_faces} cubemap faces (excluding bottom)")
             else:
                 # Move frames to combined directory with global numbering
                 for frame_path in frame_paths:
@@ -436,8 +459,9 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
     print(f"\n✅ Total frames extracted: {len(all_frame_paths)}")
 
     # Run COLMAP reconstruction with retry logic
+    # For 360 mode, use single_camera=True to ensure identical intrinsics
     print("🏗️  Running COLMAP reconstruction...")
-    if run_colmap_with_retry(output_path, colmap_cfg, images_dir):
+    if run_colmap_with_retry(output_path, colmap_cfg, images_dir, single_camera=is_360):
         print(f"🎉 COLMAP processing complete!")
         return output_path
     else:

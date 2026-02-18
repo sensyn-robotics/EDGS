@@ -621,7 +621,7 @@ def create_fallback_reconstruction(image_dir, sparse_path):
     print("⚠️  Note: This is a basic reconstruction with assumed camera positions. Results may be limited.")
 
 
-def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_optimal_quality"):
+def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_optimal_quality", single_camera=False):
     """
     Runs feature extraction, matching, and mapping on all images inside scene_dir/images using pycolmap.
     Forces PINHOLE camera model to avoid distortion issues.
@@ -632,6 +632,8 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
         colmap_config: Either a string config name or a dictionary with config settings.
             If string, options are: 'high_accuracy', 'balanced', 'low_memory', 'very_low_memory'
             If dict, should contain the full configuration.
+        single_camera (bool): If True, forces all images to share identical camera intrinsics.
+            Useful for 360 video processing where all perspective views have the same FOV.
     """
     start_time = time.time()
     print(f"Running COLMAP pipeline on all images inside {scene_dir}")
@@ -656,11 +658,21 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
 
     # Step 1: Feature Extraction using configuration
     sift_options = config['sift_extraction']
-    
+
+    # Configure reader options for single camera mode (360 video processing)
+    reader_options = {}
+    if single_camera:
+        reader_options = {
+            'single_camera': True,
+            'camera_model': 'PINHOLE',  # Force PINHOLE for consistent intrinsics
+        }
+        print("📷 Single camera mode enabled - all images will share identical intrinsics")
+
     pycolmap.extract_features(
         database_path,
         image_dir,
         sift_options=sift_options,
+        reader_options=reader_options if single_camera else None,
     )
     print(f"Finished feature extraction in {(time.time() - start_time):.2f}s.")
 
@@ -749,9 +761,17 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
     
     # Bundle adjustment refinement settings (try to set if available)
     try:
-        pipeline_options.mapper.global_ba_refine_focal_length = True
-        pipeline_options.mapper.global_ba_refine_principal_point = False
-        pipeline_options.mapper.global_ba_refine_extra_params = False
+        # When single_camera mode is enabled, disable focal length refinement
+        # to keep all cameras with identical intrinsics (important for 360 processing)
+        if single_camera:
+            pipeline_options.mapper.global_ba_refine_focal_length = False
+            pipeline_options.mapper.global_ba_refine_principal_point = False
+            pipeline_options.mapper.global_ba_refine_extra_params = False
+            print("🔒 Disabled focal length refinement for single camera mode")
+        else:
+            pipeline_options.mapper.global_ba_refine_focal_length = True
+            pipeline_options.mapper.global_ba_refine_principal_point = False
+            pipeline_options.mapper.global_ba_refine_extra_params = False
     except AttributeError:
         pass  # Skip if not available in this pycolmap version
     

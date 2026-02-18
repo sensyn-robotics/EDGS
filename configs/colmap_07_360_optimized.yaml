@@ -1,0 +1,61 @@
+# COLMAP Configuration: 07 - 360 Video Optimized
+# Specialized settings for 360 degree equirectangular video processing
+# Key optimizations:
+# - Lower FPS (0.5) for long videos to reduce redundant frames
+# - Minimum 1024px output for acceptable reconstruction quality
+# - Single camera mode for identical intrinsics across all perspective views
+# - Square output images (not 2:1 aspect ratio)
+# - Exhaustive matching for grouped views (since sequential won't work well with direction-grouped images)
+
+# Data type: use exhaustive matching for 360 videos
+# Views are grouped by direction, not sequential, so exhaustive is more appropriate
+data_type: individual
+
+# 360-specific processing settings
+processing_360:
+  single_camera: true          # Force identical camera intrinsics for all views
+  output_square: true          # Output square images (not 2:1 aspect ratio)
+  min_output_size: 1024        # Minimum size for perspective views
+
+# Video/Image preprocessing settings
+preprocessing:
+  target_fps: 0.5              # Lower FPS for long 360 videos (reduces redundant frames)
+  max_image_size: 1024         # Minimum 1024px for acceptable reconstruction quality
+
+sift_extraction:
+  max_num_features: 8192       # Good feature count for 360 reconstruction
+  max_image_size: 2048         # Allow larger images for better detail
+  first_octave: -1             # Enable super-resolution features
+  num_octaves: 4               # Standard octaves
+  octave_resolution: 3         # Standard resolution
+  peak_threshold: 0.0067       # COLMAP default
+  edge_threshold: 10           # COLMAP default
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  # More lenient matching for 360 views which may have perspective distortion differences
+  max_ratio: 0.85              # Slightly more lenient than default
+  max_distance: 0.75           # Slightly more lenient than default
+  cross_check: true
+  max_num_matches: 32768
+
+pipeline:
+  min_num_matches: 15
+  multiple_models: false       # Single model for 360 reconstruction
+  max_num_models: 1
+  max_model_overlap: 20
+  min_model_size: 10
+  extract_colors: true
+  num_threads: -1              # Use all threads
+
+mapper:
+  init_min_num_inliers: 15
+  init_max_error: 4.0
+  init_min_tri_angle: 2.0
+  abs_pose_min_num_inliers: 15
+  abs_pose_max_error: 8.0
+  abs_pose_min_inlier_ratio: 0.15
+  filter_max_reproj_error: 4.0
+  filter_min_tri_angle: 0.5

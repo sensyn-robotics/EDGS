@@ -23,7 +23,7 @@ import tempfile
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'}
 
 
-def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90):
+def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90, output_size=None):
     """
     Convert an equirectangular 360 image to 13 perspective images.
 
@@ -34,12 +34,25 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90):
         input_image_path: Path to equirectangular image
         output_dir: Directory to save output images
         fov: Field of view in degrees (default 90)
+        output_size: Size of square output images in pixels. If None, uses input image height.
+                     Minimum enforced size is 1024px.
 
     Returns:
-        List of paths to the 13 generated images
+        Dict mapping face names to paths: {face_name: path, ...}
     """
+    from PIL import Image
+
     os.makedirs(output_dir, exist_ok=True)
     basename = os.path.splitext(os.path.basename(input_image_path))[0]
+
+    # Calculate output size from input height if not specified
+    if output_size is None:
+        with Image.open(input_image_path) as img:
+            # Use height for square output (equirectangular is 2:1 aspect)
+            output_size = img.height
+
+    # Enforce minimum size of 1024px for better reconstruction quality
+    output_size = max(1024, output_size)
 
     # Vertex pitch angles: arcsin(1/√3) ≈ 35.264°
     pitch_up = 35.264
@@ -64,7 +77,7 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90):
         ("back_left_bottom", 135, pitch_down, 0),
     ]
 
-    output_paths = []
+    output_paths = {}
 
     for face_name, yaw, pitch, roll in faces:
         output_path = os.path.join(output_dir, f"{basename}_{face_name}.png")
@@ -72,17 +85,18 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90):
         # Build ffmpeg command for v360 filter
         # e:rectilinear converts equirectangular to rectilinear projection
         # Using wider FOV (default 110°) for more overlap between views
+        # w/h parameters ensure square output
         cmd = [
             "ffmpeg",
             "-i", input_image_path,
-            "-vf", f"v360=e:rectilinear:h_fov={fov}:v_fov={fov}:yaw={yaw}:pitch={pitch}:roll={roll}",
+            "-vf", f"v360=e:rectilinear:h_fov={fov}:v_fov={fov}:yaw={yaw}:pitch={pitch}:roll={roll}:w={output_size}:h={output_size}",
             "-y",  # Overwrite output files
             output_path
         ]
 
         try:
             subprocess.run(cmd, check=True, capture_output=True, text=True)
-            output_paths.append(output_path)
+            output_paths[face_name] = output_path
         except subprocess.CalledProcessError as e:
             print(f"  ⚠️ Warning: Failed to generate {face_name} face: {e.stderr}")
             continue
@@ -220,7 +234,7 @@ def main():
                 # Convert this frame to vertex-centered views
                 frame_output_dir = os.path.join(output_dir, f"frame_{frame_idx:04d}")
                 cubemap_faces = convert_equirectangular_to_cubemap(frame_path, frame_output_dir, fov=args.fov)
-                all_cubemap_faces.extend(cubemap_faces)
+                all_cubemap_faces.extend(cubemap_faces.values())
 
                 print(f"   ✅ Frame {frame_idx+1}/{num_frames} converted")
 
@@ -245,8 +259,8 @@ def main():
         cubemap_faces = convert_equirectangular_to_cubemap(input_path, output_dir, fov=args.fov)
 
         print(f"✅ Successfully generated {len(cubemap_faces)} vertex-centered views:")
-        for face in cubemap_faces:
-            print(f"   - {os.path.basename(face)}")
+        for face_name, face_path in cubemap_faces.items():
+            print(f"   - {face_name}: {os.path.basename(face_path)}")
 
         # Clean up temp directory if we created one
         if args.time is not None:

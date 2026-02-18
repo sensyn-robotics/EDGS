@@ -5,7 +5,7 @@
 # Video/Image preprocessing settings
 preprocessing:
   target_fps: 1.0              # Minimal frame rate for lowest memory usage
-  max_image_size: 800          # Small image size for severe memory constraints
+  max_image_size: 1024         # Minimum 1024px for acceptable reconstruction quality
 
 sift_extraction:
   max_num_features: 2048       # Minimal feature count
