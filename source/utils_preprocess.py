@@ -659,21 +659,22 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
     # Step 1: Feature Extraction using configuration
     sift_options = config['sift_extraction']
 
-    # Configure reader options for single camera mode (360 video processing)
-    reader_options = {}
+    # Configure extraction parameters for single camera mode (360 video processing)
     if single_camera:
-        reader_options = {
-            'single_camera': True,
-            'camera_model': 'PINHOLE',  # Force PINHOLE for consistent intrinsics
-        }
         print("📷 Single camera mode enabled - all images will share identical intrinsics")
-
-    pycolmap.extract_features(
-        database_path,
-        image_dir,
-        sift_options=sift_options,
-        reader_options=reader_options if single_camera else None,
-    )
+        pycolmap.extract_features(
+            database_path,
+            image_dir,
+            camera_mode=pycolmap.CameraMode.SINGLE,
+            camera_model='PINHOLE',
+            sift_options=sift_options,
+        )
+    else:
+        pycolmap.extract_features(
+            database_path,
+            image_dir,
+            sift_options=sift_options,
+        )
     print(f"Finished feature extraction in {(time.time() - start_time):.2f}s.")
 
     # Step 2: Feature Matching using configuration
