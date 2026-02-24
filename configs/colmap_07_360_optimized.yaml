@@ -4,11 +4,18 @@
 # - 5 perspective views per frame (front, right, back, left, top) with FOV overlap
 # - Max 1000 total images (= 200 frames × 5 faces)
 # - Single camera mode for identical intrinsics across all perspective views
-# - Exhaustive matching for grouped views (since sequential won't work well with direction-grouped images)
+# - Sequential matching with vocab tree loop closure for interleaved frame ordering
 
-# Data type: use exhaustive matching for 360 videos
-# Views are grouped by direction, not sequential, so exhaustive is more appropriate
-data_type: individual
+# Data type: video enables sequential matching for temporal neighbors
+# Images are ordered by frame (interleaved faces), so sequential covers same-frame + temporal overlap
+# Vocab tree matching adds loop closure on top
+data_type: video
+
+# Sequential matching overlap: with 5 faces/frame, overlap=15 covers 3 frames in each direction
+sequential_overlap: 15
+
+# Vocab tree for loop closure (matches distant frames that revisit same area)
+vocab_tree_path: /EDGS/data/vocab_tree_faiss_flickr100K_words256K.bin
 
 # 360-specific processing settings
 processing_360:

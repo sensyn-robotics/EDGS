@@ -174,12 +174,6 @@ def run_colmap_with_retry(output_path, colmap_cfg, images_dir, single_camera=Fal
     min_registered = get_min_registered_images(images_dir)
     total_images = len(find_images_in_directory(images_dir))
 
-    # Ensure video data type for sequential matching (critical for video input)
-    if 'data_type' not in colmap_cfg or colmap_cfg.get('data_type') == 'individual':
-        print("🔧 Setting data_type to 'video' for sequential matching")
-        colmap_cfg = copy.deepcopy(colmap_cfg)
-        colmap_cfg['data_type'] = 'video'
-
     # Define retry configurations with progressively more lenient settings
     retry_configs = [
         # First attempt: original config with video data type
@@ -412,24 +406,25 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
                 cubemap_temp_dir = os.path.join(output_path, f"temp_cubemap_{idx}")
                 os.makedirs(cubemap_temp_dir, exist_ok=True)
 
-                # Collect faces by direction for proper ordering
-                faces_by_direction = {face: [] for face in FACE_ORDER}
+                # Collect faces per frame for interleaved ordering
+                frames_faces = []  # list of lists: [[front, right, back, left, top], ...]
 
                 for frame_path in frame_paths:
-                    # Convert each equirectangular frame to perspective views
-                    # Returns dict: {face_name: face_path}
                     cubemap_faces = convert_equirectangular_to_cubemap(frame_path, cubemap_temp_dir, fov=fov_360)
+                    # Collect faces in consistent order for this frame
+                    frame_face_paths = []
+                    for face_name in FACE_ORDER:
+                        if face_name in cubemap_faces:
+                            frame_face_paths.append(cubemap_faces[face_name])
+                    frames_faces.append(frame_face_paths)
 
-                    # Collect faces by direction
-                    for face_name, face_path in cubemap_faces.items():
-                        if face_name in faces_by_direction:
-                            faces_by_direction[face_name].append(face_path)
-
-                # Renumber images by direction: all fronts → all rights → all backs → etc.
-                # This grouping improves sequential matching in COLMAP
-                print(f"  📋 Reordering images by view direction for better matching...")
-                for face_name in FACE_ORDER:
-                    for face_path in faces_by_direction[face_name]:
+                # Order by frame (interleaved): frame0_front, frame0_right, ..., frame0_top, frame1_front, ...
+                # This enables sequential matching to cover:
+                #   - Same-frame faces (within 5 neighbors)
+                #   - Same-face temporal neighbors (5 apart)
+                print(f"  📋 Ordering images by frame (interleaved) for sequential + loop closure matching...")
+                for frame_face_paths in frames_faces:
+                    for face_path in frame_face_paths:
                         new_filename = f"{frame_counter:08d}.png"
                         new_path = os.path.join(images_dir, new_filename)
                         shutil.move(face_path, new_path)
@@ -440,7 +435,7 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
                 if os.path.exists(cubemap_temp_dir):
                     shutil.rmtree(cubemap_temp_dir)
 
-                total_faces = sum(len(faces) for faces in faces_by_direction.values())
+                total_faces = sum(len(ff) for ff in frames_faces)
                 print(f"  ✅ Converted {len(frame_paths)} frames to {total_faces} cubemap faces (excluding bottom)")
             else:
                 # Move frames to combined directory with global numbering

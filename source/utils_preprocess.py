@@ -697,34 +697,43 @@ def run_colmap_on_scene(scene_dir, force_pinhole=True, colmap_config="colmap_03_
 
     print(f"Database contains {num_images} images")
 
-    # Determine matching strategy based on image count
-    # COLMAP uses: < 200 images OR no vocab tree -> exhaustive
-    #              >= 200 images AND vocab tree -> vocab tree matching
-    # For video data, COLMAP uses sequential matching
-
     # Check if vocab tree is available
     vocab_tree_path = config.get('vocab_tree_path', None)
     data_type = config.get('data_type', 'individual')  # 'video', 'individual', or 'internet'
+    print(f"Matching strategy: data_type={data_type}, vocab_tree={vocab_tree_path}")
+
+    sequential_overlap = config.get('sequential_overlap', 20)
 
     try:
         if data_type == 'video':
-            # For video data: use sequential matching
-            print("Using sequential matching for video data...")
+            # Step 1: Sequential matching for temporal neighbors
+            seq_options = pycolmap.SequentialMatchingOptions()
+            seq_options.overlap = sequential_overlap
+            seq_options.quadratic_overlap = False
+            print(f"Using sequential matching (overlap={sequential_overlap}) for video data...")
             pycolmap.match_sequential(database_path,
                                     sift_options=matching_options,
-                                    overlap=20,
-                                    quadratic_overlap=False)
+                                    matching_options=seq_options)
             print("Sequential matching completed.")
-        elif vocab_tree_path and num_images >= 200:
-            # For large datasets with vocab tree: use vocabulary tree matching
+
+            # Step 2: Vocab tree matching for loop closure (if available)
+            if vocab_tree_path and os.path.exists(vocab_tree_path):
+                vt_options = pycolmap.VocabTreeMatchingOptions()
+                vt_options.vocab_tree_path = vocab_tree_path
+                print(f"Adding vocab tree matching for loop closure ({num_images} images)...")
+                pycolmap.match_vocabtree(database_path,
+                                       sift_options=matching_options,
+                                       matching_options=vt_options)
+                print("Vocab tree loop closure matching completed.")
+        elif vocab_tree_path and os.path.exists(vocab_tree_path) and num_images >= 200:
+            vt_options = pycolmap.VocabTreeMatchingOptions()
+            vt_options.vocab_tree_path = vocab_tree_path
             print(f"Using vocabulary tree matching for {num_images} images...")
-            print(f"Vocab tree path: {vocab_tree_path}")
             pycolmap.match_vocabtree(database_path,
-                                   vocab_tree_path=vocab_tree_path,
-                                   sift_options=matching_options)
+                                   sift_options=matching_options,
+                                   matching_options=vt_options)
             print("Vocabulary tree matching completed.")
         else:
-            # For small datasets or without vocab tree: use exhaustive matching
             print(f"Using exhaustive matching for {num_images} images...")
             pycolmap.match_exhaustive(database_path, sift_options=matching_options)
             print("Exhaustive matching completed.")
