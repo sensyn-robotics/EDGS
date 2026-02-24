@@ -621,7 +621,7 @@ def main():
 
     # Train the model
     print("\n🚀 Starting EDGS optimization...")
-    trainer.saving_iterations = []
+    # Keep default save_iterations from config for intermediate checkpoints
     trainer.train(cfg.train)
 
     # Visualize final views

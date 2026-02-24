@@ -19,7 +19,7 @@ processing_360:
 
 # Video/Image preprocessing settings
 preprocessing:
-  target_fps: 0.5              # Lower FPS for long 360 videos (reduces redundant frames)
+  target_fps: 3.0              # Higher FPS for better reconstruction coverage
   max_image_size: 1024         # Minimum 1024px for acceptable reconstruction quality
 
 sift_extraction:

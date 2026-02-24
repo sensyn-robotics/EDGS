@@ -1,6 +1,6 @@
 #!/bin/bash
 # EDGS Tmux-based training script with automatic PSNR monitoring and retry
-# Usage: ./script/train_tmux.sh <input_video> <output_path> [--360]
+# Usage: ./script/train_tmux.sh --input <video> --output_path <dir> [--360] [--config <name>] [--colmap_config <name>]
 #
 # Features:
 # - Runs training in tmux (survives terminal close)
@@ -10,7 +10,8 @@
 # - Easy to attach/detach: tmux attach -t edgs
 #
 # Examples:
-#   ./script/train_tmux.sh data/video.mp4 outputs/scene1 --360
+#   ./script/train_tmux.sh --input data/video.mp4 --output_path outputs/scene1 --360
+#   ./script/train_tmux.sh --input data/video.mp4 --output_path outputs/scene1 --360 --colmap_config colmap_07_360_optimized
 
 set -e
 
@@ -22,16 +23,51 @@ MONITOR_INTERVAL=600  # 10 minutes in seconds
 MAX_RETRIES=10
 
 # Parse arguments
-INPUT_VIDEO="${1:-}"
-OUTPUT_PATH="${2:-}"
+INPUT_VIDEO=""
+OUTPUT_PATH=""
 FLAG_360=""
-if [ "$3" == "--360" ]; then
-    FLAG_360="--360"
-fi
+USER_CONFIG=""
+USER_COLMAP_CONFIG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --input)
+            INPUT_VIDEO="$2"
+            shift 2
+            ;;
+        --output_path)
+            OUTPUT_PATH="$2"
+            shift 2
+            ;;
+        --360)
+            FLAG_360="--360"
+            shift
+            ;;
+        --config)
+            USER_CONFIG="$2"
+            shift 2
+            ;;
+        --colmap_config)
+            USER_COLMAP_CONFIG="$2"
+            shift 2
+            ;;
+        *)
+            # Support legacy positional args: <input> <output> [--360]
+            if [ -z "$INPUT_VIDEO" ]; then
+                INPUT_VIDEO="$1"
+            elif [ -z "$OUTPUT_PATH" ]; then
+                OUTPUT_PATH="$1"
+            elif [ "$1" == "--360" ]; then
+                FLAG_360="--360"
+            fi
+            shift
+            ;;
+    esac
+done
 
 if [ -z "$INPUT_VIDEO" ] || [ -z "$OUTPUT_PATH" ]; then
-    echo "Usage: $0 <input_video> <output_path> [--360]"
-    echo "Example: $0 data/video.mp4 outputs/scene1 --360"
+    echo "Usage: $0 --input <video> --output_path <dir> [--360] [--config <name>] [--colmap_config <name>]"
+    echo "Example: $0 --input data/video.mp4 --output_path outputs/scene1 --360 --colmap_config colmap_07_360_optimized"
     exit 1
 fi
 
@@ -44,9 +80,11 @@ MONITOR_LOG="${LOG_DIR}/${SCENE_NAME}_monitor_${TIMESTAMP}.log"
 
 mkdir -p "$LOG_DIR"
 
-# Config progression for retries (start with highest quality, reduce on failure)
-CONFIGS=("train_large" "train_xlarge" "train_xlarge" "train_xlarge")
-COLMAP_CONFIGS=("colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
+# Config progression for retries (start with user-specified or default, reduce on failure)
+DEFAULT_CONFIG="${USER_CONFIG:-train_large}"
+DEFAULT_COLMAP_CONFIG="${USER_COLMAP_CONFIG:-colmap_06_lowest_quality}"
+CONFIGS=("$DEFAULT_CONFIG" "train_xlarge" "train_06_lowest_quality" "train_06_lowest_quality")
+COLMAP_CONFIGS=("$DEFAULT_COLMAP_CONFIG" "$DEFAULT_COLMAP_CONFIG" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
 
 # Kill existing session if running
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
@@ -62,6 +100,8 @@ echo "Session:    $SESSION_NAME"
 echo "Input:      $INPUT_VIDEO"
 echo "Output:     $OUTPUT_PATH"
 echo "360 mode:   ${FLAG_360:-No}"
+echo "Config:     $DEFAULT_CONFIG"
+echo "COLMAP:     $DEFAULT_COLMAP_CONFIG"
 echo "Train log:  $TRAIN_LOG"
 echo "Monitor:    Every ${MONITOR_INTERVAL}s (10 min)"
 echo "=============================================="
@@ -79,13 +119,17 @@ MIN_PSNR="$4"
 MONITOR_INTERVAL="$5"
 MAX_RETRIES="$6"
 TRAIN_LOG="$7"
+USER_CONFIG="$8"
+USER_COLMAP_CONFIG="$9"
 
 PROJECT_DIR="/home/mas/proj/sensyn/EDGS"
 cd "$PROJECT_DIR"
 
-# Config arrays
-CONFIGS=("train_large" "train_xlarge" "train_xlarge" "train_xlarge")
-COLMAP_CONFIGS=("colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
+# Config arrays - progression from user-specified to fallbacks
+DEFAULT_CONFIG="${USER_CONFIG:-train_large}"
+DEFAULT_COLMAP_CONFIG="${USER_COLMAP_CONFIG:-colmap_06_lowest_quality}"
+CONFIGS=("$DEFAULT_CONFIG" "train_xlarge" "train_06_lowest_quality" "train_06_lowest_quality")
+COLMAP_CONFIGS=("$DEFAULT_COLMAP_CONFIG" "$DEFAULT_COLMAP_CONFIG" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
 
 get_psnr() {
     local log="$1"
@@ -233,7 +277,7 @@ chmod +x "${PROJECT_DIR}/script/edgs_monitor.sh"
 tmux new-session -d -s "$SESSION_NAME" -n training -c "$PROJECT_DIR"
 
 # Start monitor script in the training window
-tmux send-keys -t "${SESSION_NAME}:training" "bash script/edgs_monitor.sh '$INPUT_VIDEO' '$OUTPUT_PATH' '$FLAG_360' '$MIN_PSNR' '$MONITOR_INTERVAL' '$MAX_RETRIES' '$TRAIN_LOG' 2>&1 | tee $MONITOR_LOG" Enter
+tmux send-keys -t "${SESSION_NAME}:training" "bash script/edgs_monitor.sh '$INPUT_VIDEO' '$OUTPUT_PATH' '$FLAG_360' '$MIN_PSNR' '$MONITOR_INTERVAL' '$MAX_RETRIES' '$TRAIN_LOG' '$DEFAULT_CONFIG' '$DEFAULT_COLMAP_CONFIG' 2>&1 | tee $MONITOR_LOG" Enter
 
 # Create status window
 tmux new-window -t "$SESSION_NAME" -n status -c "$PROJECT_DIR"
