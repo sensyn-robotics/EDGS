@@ -5,12 +5,10 @@
 Convert equirectangular 360° images to perspective views.
 
 This module provides functionality to convert 360 degree equirectangular images
-into 13 perspective images using ffmpeg's v360 filter:
+into 5 perspective images using ffmpeg's v360 filter:
 - 5 cube face centers (front, right, back, left, top - excluding bottom)
-- 8 vertex-centered views pointing at cube corners
 
-The combined approach provides maximum overlap between views, which helps with
-feature matching and 3DGS convergence.
+Adjacent views overlap by (FOV - 90°). With default FOV=120°, overlap is ~25%.
 """
 
 import argparse
@@ -23,17 +21,17 @@ import tempfile
 VIDEO_EXTENSIONS = {'.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv', '.wmv', '.m4v'}
 
 
-def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90, output_size=None):
+def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=120, output_size=None):
     """
-    Convert an equirectangular 360 image to 13 perspective images.
+    Convert an equirectangular 360 image to 5 perspective images.
 
-    Generates 5 cube face views (excluding bottom) + 8 vertex-centered views
-    for maximum overlap, which helps with feature matching and 3DGS convergence.
+    Generates 5 cube face views (front, right, back, left, top - excluding bottom).
+    Adjacent views overlap by (FOV - 90°). With default FOV=120°, overlap is ~25%.
 
     Args:
         input_image_path: Path to equirectangular image
         output_dir: Directory to save output images
-        fov: Field of view in degrees (default 90)
+        fov: Field of view in degrees (default 120, giving ~25% overlap between adjacent views)
         output_size: Size of square output images in pixels. If None, uses input image height.
                      Minimum enforced size is 1024px.
 
@@ -54,27 +52,15 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90, out
     # Enforce minimum size of 1024px for better reconstruction quality
     output_size = max(1024, output_size)
 
-    # Vertex pitch angles: arcsin(1/√3) ≈ 35.264°
-    pitch_up = 35.264
-    pitch_down = -35.264
-
     # Format: (suffix, yaw, pitch, roll)
+    # 5 cube face centers (excluding bottom)
+    # With FOV > 90°, adjacent faces overlap by (FOV - 90°)
     faces = [
-        # 5 cube face centers (excluding bottom)
         ("front", 0, 0, 0),
         ("right", -90, 0, 0),
         ("back", 180, 0, 0),
         ("left", 90, 0, 0),
         ("top", 0, 90, 0),
-        # 8 vertex-centered views (upper 4 + lower 4)
-        ("front_right_top", -45, pitch_up, 0),
-        ("front_left_top", 45, pitch_up, 0),
-        ("back_right_top", -135, pitch_up, 0),
-        ("back_left_top", 135, pitch_up, 0),
-        ("front_right_bottom", -45, pitch_down, 0),
-        ("front_left_bottom", 45, pitch_down, 0),
-        ("back_right_bottom", -135, pitch_down, 0),
-        ("back_left_bottom", 135, pitch_down, 0),
     ]
 
     output_paths = {}
@@ -107,7 +93,7 @@ def convert_equirectangular_to_cubemap(input_image_path, output_dir, fov=90, out
 def main():
     """Command-line interface for converting equirectangular images to perspective views."""
     parser = argparse.ArgumentParser(
-        description="Convert 360° equirectangular images/videos to 13 perspective views (5 faces + 8 vertices)."
+        description="Convert 360° equirectangular images/videos to 5 perspective views (front, right, back, left, top)."
     )
     parser.add_argument(
         "input",
@@ -135,8 +121,8 @@ def main():
         "--fov",
         type=float,
         metavar="DEGREES",
-        default=110,
-        help="Field of view in degrees for each view. Higher = more overlap. Default: 110"
+        default=120,
+        help="Field of view in degrees for each view. Higher = more overlap. Default: 120 (~25%% overlap)"
     )
 
     args = parser.parse_args()
@@ -250,7 +236,7 @@ def main():
         return 0
 
     # Convert to perspective views (for single image or single frame from video)
-    print("🌐 Converting equirectangular image to 13 views (5 faces + 8 vertices)...")
+    print("🌐 Converting equirectangular image to 5 perspective views...")
     print(f"   Input: {os.path.basename(input_path)}")
     print(f"   Output: {output_dir}")
     print()

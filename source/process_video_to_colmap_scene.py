@@ -19,11 +19,8 @@ from source.convert_equirectangular_to_cubemap import convert_equirectangular_to
 
 # Face order for grouping 360 images by view direction
 # This ensures sequential matching works well: all fronts → all rights → all backs → etc.
-FACE_ORDER = [
-    "front", "right", "back", "left", "top",
-    "front_right_top", "front_left_top", "back_right_top", "back_left_top",
-    "front_right_bottom", "front_left_bottom", "back_right_bottom", "back_left_bottom"
-]
+FACE_ORDER = ["front", "right", "back", "left", "top"]
+FACES_PER_FRAME = len(FACE_ORDER)
 
 
 def check_colmap_scene(directory_path, min_registered_images=2):
@@ -293,7 +290,7 @@ def run_colmap_with_retry(output_path, colmap_cfg, images_dir, single_camera=Fal
     return False
 
 
-def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=False, fov_360=90):
+def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=False, fov_360=120, max_frames=None):
     """
     Process video(s) with uniform frame extraction and run COLMAP.
 
@@ -302,7 +299,9 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
         output_path: Directory to save COLMAP scene
         colmap_cfg: COLMAP configuration dictionary with preprocessing settings
         is_360: If True, process as 360 degree equirectangular video
-        fov_360: Field of view for 360 perspective conversion (default 90°, lower = less overlap)
+        fov_360: Field of view for 360 perspective conversion (default 120°, ~25% overlap)
+        max_frames: Maximum number of video frames to extract (None = no limit).
+                    For 360 mode, total images = max_frames × 5 faces.
 
     Returns:
         scene_dir: Path to COLMAP scene directory
@@ -361,6 +360,12 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
     else:
         frames_per_video = None
 
+    # Enforce max_total_images cap (default 1000 for 360 mode)
+    max_total_images = colmap_cfg.get('processing_360', {}).get('max_total_images', 1000) if is_360 else None
+    if is_360 and max_frames is None and max_total_images:
+        max_frames = max_total_images // FACES_PER_FRAME
+        print(f"📊 Max total images: {max_total_images} → max {max_frames} frames (× {FACES_PER_FRAME} faces)")
+
     for idx, video_file in enumerate(videos):
         print(f"\n🔄 Processing video {idx+1}/{len(videos)}: {os.path.basename(video_file)}")
 
@@ -374,13 +379,16 @@ def process_video_to_colmap_scene(video_path, output_path, colmap_cfg, is_360=Fa
             target_fps = colmap_cfg.get('preprocessing', {}).get('target_fps', 3.0)
 
             if duration and duration > 0:
-                # Calculate based on ACTUAL duration, not 3 minutes!
                 target_num_frames = int(target_fps * duration)
                 print(f"  📊 Video duration: {duration:.1f}s, extracting {target_num_frames} frames at {target_fps} fps")
             else:
-                # If we can't get duration, use a reasonable default
                 target_num_frames = 300
                 print(f"  ⚠️ Could not determine video duration, using default {target_num_frames} frames")
+
+        # Apply max_frames cap
+        if max_frames and target_num_frames > max_frames:
+            print(f"  📊 Capping frames from {target_num_frames} to {max_frames}")
+            target_num_frames = max_frames
 
         print(f"  🎯 Requesting {target_num_frames} frames")
 

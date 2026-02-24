@@ -1,10 +1,9 @@
 # COLMAP Configuration: 07 - 360 Video Optimized
 # Specialized settings for 360 degree equirectangular video processing
 # Key optimizations:
-# - Lower FPS (0.5) for long videos to reduce redundant frames
-# - Minimum 1024px output for acceptable reconstruction quality
+# - 5 perspective views per frame (front, right, back, left, top) with FOV overlap
+# - Max 1000 total images (= 200 frames × 5 faces)
 # - Single camera mode for identical intrinsics across all perspective views
-# - Square output images (not 2:1 aspect ratio)
 # - Exhaustive matching for grouped views (since sequential won't work well with direction-grouped images)
 
 # Data type: use exhaustive matching for 360 videos
@@ -16,6 +15,7 @@ processing_360:
   single_camera: true          # Force identical camera intrinsics for all views
   output_square: true          # Output square images (not 2:1 aspect ratio)
   min_output_size: 1024        # Minimum size for perspective views
+  max_total_images: 1000       # Cap total perspective images (= max_frames × 5 faces)
 
 # Video/Image preprocessing settings
 preprocessing:

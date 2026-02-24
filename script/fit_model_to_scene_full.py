@@ -337,8 +337,14 @@ def parse_arguments():
     parser.add_argument(
         "--fov-360",
         type=float,
-        default=90,
-        help="Field of view for 360 perspective conversion (default 90°, lower = less overlap).",
+        default=120,
+        help="Field of view for 360 perspective conversion (default 120°, ~25%% overlap).",
+    )
+    parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=None,
+        help="Maximum number of video frames to extract. For 360: total images = max_frames × 5.",
     )
     return parser.parse_args()
 
@@ -402,13 +408,15 @@ def prepare_scene_directory(args, colmap_cfg):
             is_360_mode = getattr(args, '360', False)
             if is_360_mode:
                 print("🌐 360 degree video mode enabled")
-            fov_360 = getattr(args, 'fov_360', 90)
+            fov_360 = getattr(args, 'fov_360', 120)
+            max_frames = getattr(args, 'max_frames', None)
             scene_dir = process_video_to_colmap_scene(
                 video_path=args.input,
                 output_path=os.path.join(base_output_path, "video_scene"),
                 colmap_cfg=colmap_cfg,
                 is_360=is_360_mode,
-                fov_360=fov_360
+                fov_360=fov_360,
+                max_frames=max_frames
             )
             return scene_dir
 
@@ -424,13 +432,15 @@ def prepare_scene_directory(args, colmap_cfg):
         is_360_mode = getattr(args, '360', False)
         if is_360_mode:
             print("🌐 360 degree video mode enabled")
-        fov_360 = getattr(args, 'fov_360', 90)
+        fov_360 = getattr(args, 'fov_360', 120)
+        max_frames = getattr(args, 'max_frames', None)
         scene_dir = process_video_to_colmap_scene(
             video_path=args.input,
             output_path=os.path.join(base_output_path, "video_scene"),
             colmap_cfg=colmap_cfg,
             is_360=is_360_mode,
-            fov_360=fov_360
+            fov_360=fov_360,
+            max_frames=max_frames
         )
         return scene_dir
 
