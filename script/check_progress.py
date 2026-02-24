@@ -85,8 +85,10 @@ def visualize_colmap(scene_path, output_dir):
     cam_forwards = []
     for image_id, image in reconstruction.images.items():
         # Camera center in world coordinates
-        R = image.cam_from_world.rotation.matrix()
-        t = image.cam_from_world.translation
+        # cam_from_world may be a method (pycolmap >= 3.11) or property
+        pose = image.cam_from_world() if callable(image.cam_from_world) else image.cam_from_world
+        R = pose.rotation.matrix()
+        t = pose.translation
         center = -R.T @ t
         cam_positions.append(center)
         # Forward direction (z-axis of camera in world)
