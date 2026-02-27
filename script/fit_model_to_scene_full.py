@@ -326,8 +326,8 @@ def parse_arguments():
         default="colmap_03_optimal_quality",
         choices=["colmap_01_highest_quality", "colmap_02_high_quality", "colmap_03_optimal_quality",
                  "colmap_04_medium_quality", "colmap_05_low_quality", "colmap_06_lowest_quality",
-                 "colmap_07_360_optimized"],
-        help="COLMAP configuration profile (01=highest to 06=lowest quality, 07=360 optimized).",
+                 "colmap_07_360_optimized", "colmap_08_360_2fps"],
+        help="COLMAP configuration profile (01=highest to 06=lowest quality, 07/08=360 optimized).",
     )
     parser.add_argument(
         "--360",
@@ -345,6 +345,13 @@ def parse_arguments():
         type=int,
         default=None,
         help="Maximum number of video frames to extract. For 360: total images = max_frames × 5.",
+    )
+    parser.add_argument(
+        "--overrides",
+        type=str,
+        nargs="*",
+        default=[],
+        help="Hydra config overrides (e.g., train.gs_epochs=60000 train.no_densify=True).",
     )
     return parser.parse_args()
 
@@ -521,8 +528,10 @@ def main():
     
     # Initialize Hydra configuration
     with initialize(config_path="../configs", version_base="1.1"):
-        cfg = compose(config_name=args.config)
+        cfg = compose(config_name=args.config, overrides=args.overrides)
         print(f"\n📋 Using training config: {args.config}")
+        if args.overrides:
+            print(f"  Overrides: {args.overrides}")
         
         # Check if using memory-optimized config
         if any(x in args.config for x in ["_04_", "_05_", "_06_", "medium", "low"]):

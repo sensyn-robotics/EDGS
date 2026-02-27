@@ -1,309 +1,155 @@
 #!/bin/bash
-# EDGS Tmux-based training script with automatic PSNR monitoring and retry
-# Usage: ./script/train_tmux.sh --input <video> --output_path <dir> [--360] [--config <name>] [--colmap_config <name>]
+# EDGS Tmux-based training with automatic quality retry
+#
+# Single video:
+#   ./script/train_tmux.sh --input data/video.mp4 --output_path outputs/scene1 --360
+#
+# Batch (all videos in a directory):
+#   ./script/train_tmux.sh --batch --data_dir data/20260121_otowa --output_base outputs/20260121_otowa --360
 #
 # Features:
-# - Runs training in tmux (survives terminal close)
-# - Monitors PSNR every 10 minutes
-# - Never finishes until PSNR > 20
-# - Automatically retries with adjusted parameters if PSNR < 20
-# - Easy to attach/detach: tmux attach -t edgs
-#
-# Examples:
-#   ./script/train_tmux.sh --input data/video.mp4 --output_path outputs/scene1 --360
-#   ./script/train_tmux.sh --input data/video.mp4 --output_path outputs/scene1 --360 --colmap_config colmap_07_360_optimized
+# - Runs in tmux (survives terminal close)
+# - Retries with different strategies until PSNR>=25, SSIM>=0.80, LPIPS<=0.18
+# - Skips scenes that already meet quality thresholds
+# - Easy: tmux attach -t edgs
 
 set -e
 
-# Configuration
 SESSION_NAME="edgs"
 PROJECT_DIR="/home/mas/proj/sensyn/EDGS"
-MIN_PSNR=20.0
-MONITOR_INTERVAL=600  # 10 minutes in seconds
 MAX_RETRIES=10
 
 # Parse arguments
+BATCH_MODE=false
 INPUT_VIDEO=""
 OUTPUT_PATH=""
+DATA_DIR=""
+OUTPUT_BASE=""
 FLAG_360=""
 USER_CONFIG=""
 USER_COLMAP_CONFIG=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --input)
-            INPUT_VIDEO="$2"
-            shift 2
-            ;;
-        --output_path)
-            OUTPUT_PATH="$2"
-            shift 2
-            ;;
-        --360)
-            FLAG_360="--360"
-            shift
-            ;;
-        --config)
-            USER_CONFIG="$2"
-            shift 2
-            ;;
-        --colmap_config)
-            USER_COLMAP_CONFIG="$2"
-            shift 2
-            ;;
-        *)
-            # Support legacy positional args: <input> <output> [--360]
-            if [ -z "$INPUT_VIDEO" ]; then
-                INPUT_VIDEO="$1"
-            elif [ -z "$OUTPUT_PATH" ]; then
-                OUTPUT_PATH="$1"
-            elif [ "$1" == "--360" ]; then
-                FLAG_360="--360"
-            fi
-            shift
-            ;;
+        --batch)         BATCH_MODE=true; shift ;;
+        --input)         INPUT_VIDEO="$2"; shift 2 ;;
+        --output_path)   OUTPUT_PATH="$2"; shift 2 ;;
+        --data_dir)      DATA_DIR="$2"; shift 2 ;;
+        --output_base)   OUTPUT_BASE="$2"; shift 2 ;;
+        --360)           FLAG_360="--360"; shift ;;
+        --config)        USER_CONFIG="$2"; shift 2 ;;
+        --colmap_config) USER_COLMAP_CONFIG="$2"; shift 2 ;;
+        *) shift ;;
     esac
 done
 
-if [ -z "$INPUT_VIDEO" ] || [ -z "$OUTPUT_PATH" ]; then
-    echo "Usage: $0 --input <video> --output_path <dir> [--360] [--config <name>] [--colmap_config <name>]"
-    echo "Example: $0 --input data/video.mp4 --output_path outputs/scene1 --360 --colmap_config colmap_07_360_optimized"
-    exit 1
+DEFAULT_CONFIG="${USER_CONFIG:-train_large_lowmem}"
+DEFAULT_COLMAP_CONFIG="${USER_COLMAP_CONFIG:-colmap_08_360_2fps}"
+
+# Validate
+if [ "$BATCH_MODE" = true ]; then
+    if [ -z "$DATA_DIR" ] || [ -z "$OUTPUT_BASE" ]; then
+        echo "Batch usage: $0 --batch --data_dir <dir> --output_base <dir> [--360] [--config <name>] [--colmap_config <name>]"
+        exit 1
+    fi
+else
+    if [ -z "$INPUT_VIDEO" ] || [ -z "$OUTPUT_PATH" ]; then
+        echo "Single usage: $0 --input <video> --output_path <dir> [--360] [--config <name>] [--colmap_config <name>]"
+        exit 1
+    fi
 fi
 
-# Paths
-LOG_DIR="${PROJECT_DIR}/outputs/logs"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-SCENE_NAME=$(basename "$OUTPUT_PATH")
-TRAIN_LOG="${LOG_DIR}/${SCENE_NAME}_${TIMESTAMP}.log"
-MONITOR_LOG="${LOG_DIR}/${SCENE_NAME}_monitor_${TIMESTAMP}.log"
-
-mkdir -p "$LOG_DIR"
-
-# Config progression for retries (start with user-specified or default, reduce on failure)
-DEFAULT_CONFIG="${USER_CONFIG:-train_large}"
-DEFAULT_COLMAP_CONFIG="${USER_COLMAP_CONFIG:-colmap_06_lowest_quality}"
-CONFIGS=("$DEFAULT_CONFIG" "train_xlarge" "train_06_lowest_quality" "train_06_lowest_quality")
-COLMAP_CONFIGS=("$DEFAULT_COLMAP_CONFIG" "$DEFAULT_COLMAP_CONFIG" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
-
-# Kill existing session if running
+# Kill existing session
 if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
     echo "Killing existing tmux session: $SESSION_NAME"
     tmux kill-session -t "$SESSION_NAME"
     sleep 1
 fi
 
-echo "=============================================="
-echo "EDGS Training in Tmux (Auto-retry until PSNR>$MIN_PSNR)"
-echo "=============================================="
-echo "Session:    $SESSION_NAME"
-echo "Input:      $INPUT_VIDEO"
-echo "Output:     $OUTPUT_PATH"
-echo "360 mode:   ${FLAG_360:-No}"
-echo "Config:     $DEFAULT_CONFIG"
-echo "COLMAP:     $DEFAULT_COLMAP_CONFIG"
-echo "Train log:  $TRAIN_LOG"
-echo "Monitor:    Every ${MONITOR_INTERVAL}s (10 min)"
-echo "=============================================="
+# Also kill any running training processes in Docker
+docker compose exec -T edgs-app bash -c "pkill -f 'batch_train_360' 2>/dev/null; pkill -f 'edgs_monitor' 2>/dev/null; pkill -f 'fit_model_to_scene_full' 2>/dev/null" 2>/dev/null || true
+sleep 1
 
-# Create the monitor script
-cat > "${PROJECT_DIR}/script/edgs_monitor.sh" << 'MONITOR_SCRIPT'
-#!/bin/bash
-# EDGS PSNR Monitor - runs until PSNR > MIN_PSNR
-set -e
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-INPUT_VIDEO="$1"
-OUTPUT_PATH="$2"
-FLAG_360="$3"
-MIN_PSNR="$4"
-MONITOR_INTERVAL="$5"
-MAX_RETRIES="$6"
-TRAIN_LOG="$7"
-USER_CONFIG="$8"
-USER_COLMAP_CONFIG="$9"
+if [ "$BATCH_MODE" = true ]; then
+    # --- Batch mode ---
+    MONITOR_LOG="${PROJECT_DIR}/outputs/logs/batch_${TIMESTAMP}.log"
+    mkdir -p "$(dirname "$MONITOR_LOG")"
 
-PROJECT_DIR="/home/mas/proj/sensyn/EDGS"
-cd "$PROJECT_DIR"
+    # Map host paths to Docker paths
+    DOCKER_DATA_DIR="/EDGS/data/$(basename "$DATA_DIR")"
+    DOCKER_OUTPUT_BASE="/EDGS/outputs/$(basename "$OUTPUT_BASE")"
 
-# Config arrays - progression from user-specified to fallbacks
-DEFAULT_CONFIG="${USER_CONFIG:-train_large}"
-DEFAULT_COLMAP_CONFIG="${USER_COLMAP_CONFIG:-colmap_06_lowest_quality}"
-CONFIGS=("$DEFAULT_CONFIG" "train_xlarge" "train_06_lowest_quality" "train_06_lowest_quality")
-COLMAP_CONFIGS=("$DEFAULT_COLMAP_CONFIG" "$DEFAULT_COLMAP_CONFIG" "colmap_06_lowest_quality" "colmap_06_lowest_quality")
+    DOCKER_CMD="bash /EDGS/script/batch_train_360.sh '${DOCKER_DATA_DIR}' '${DOCKER_OUTPUT_BASE}'"
 
-get_psnr() {
-    local log="$1"
-    # Get the last test PSNR evaluation (evaluations happen at non-round iterations like 29228)
-    grep -E "Evaluating test:.*PSNR=" "$log" 2>/dev/null | tail -1 | grep -oP "PSNR=\K[0-9.]+" || echo "0"
-}
-
-get_ply_size() {
-    local output="$1"
-    ls -l "$output/point_cloud/iteration_30000/point_cloud.ply" 2>/dev/null | awk '{print $5}' || echo "0"
-}
-
-is_training_running() {
-    ps aux | grep -v grep | grep "fit_model_to_scene" | grep -q "$OUTPUT_PATH" 2>/dev/null
-}
-
-wait_for_completion() {
-    echo "$(date): Waiting for training to complete..."
-    while is_training_running; do
-        sleep 60
-    done
-    echo "$(date): Training process ended"
-}
-
-run_training() {
-    local config="$1"
-    local colmap_config="$2"
-    local attempt="$3"
-
-    echo "$(date): Starting training attempt $attempt with config=$config, colmap=$colmap_config"
-
-    # Clean previous training artifacts but keep COLMAP if possible
-    rm -rf "$OUTPUT_PATH/point_cloud" "$OUTPUT_PATH/chkpnt"* "$OUTPUT_PATH/input.ply" "$OUTPUT_PATH/cameras.json" 2>/dev/null || true
-
-    # If switching to a different colmap config, clean everything
-    if [ "$colmap_config" != "${COLMAP_CONFIGS[0]}" ]; then
-        rm -rf "$OUTPUT_PATH" 2>/dev/null || true
-    fi
-
-    # Run training
-    docker compose exec -T edgs-app python script/fit_model_to_scene_full.py \
-        --input "/EDGS/${INPUT_VIDEO}" \
-        --output_path "/EDGS/${OUTPUT_PATH}" \
-        --config "$config" \
-        --colmap_config "$colmap_config" \
-        $FLAG_360 >> "$TRAIN_LOG" 2>&1 &
-
-    sleep 5  # Wait for process to start
-}
-
-check_for_oom() {
-    local log="$1"
-    grep -q "OutOfMemoryError\|CUDA out of memory" "$log" 2>/dev/null
-}
-
-# Main loop
-attempt=0
-config_idx=0
-
-while [ $attempt -lt $MAX_RETRIES ]; do
-    attempt=$((attempt + 1))
-    config="${CONFIGS[$config_idx]}"
-    colmap_config="${COLMAP_CONFIGS[$config_idx]}"
-
-    echo ""
     echo "=============================================="
-    echo "$(date): ATTEMPT $attempt / $MAX_RETRIES"
-    echo "Config: $config, COLMAP: $colmap_config"
+    echo "EDGS Batch Training in Tmux"
+    echo "=============================================="
+    echo "Session:    $SESSION_NAME"
+    echo "Data dir:   $DATA_DIR -> $DOCKER_DATA_DIR"
+    echo "Output:     $OUTPUT_BASE -> $DOCKER_OUTPUT_BASE"
+    echo "360 mode:   ${FLAG_360:-No}"
+    echo "Config:     $DEFAULT_CONFIG"
+    echo "COLMAP:     $DEFAULT_COLMAP_CONFIG"
+    echo "Quality:    PSNR>=25 SSIM>=0.80 LPIPS<=0.18"
+    echo "Log:        $MONITOR_LOG"
     echo "=============================================="
 
-    # Start training
-    run_training "$config" "$colmap_config" "$attempt"
+    # Create tmux session
+    tmux new-session -d -s "$SESSION_NAME" -n training -c "$PROJECT_DIR"
+    tmux send-keys -t "${SESSION_NAME}:training" "cd $PROJECT_DIR && docker compose exec -T edgs-app bash -c \"$DOCKER_CMD\" 2>&1 | tee '$MONITOR_LOG'" Enter
 
-    # Monitor loop
-    while true; do
-        sleep $MONITOR_INTERVAL
+    # Status window
+    tmux new-window -t "$SESSION_NAME" -n status -c "$PROJECT_DIR"
+    tmux send-keys -t "${SESSION_NAME}:status" "watch -n 30 'echo \"=== Batch Progress ===\"; grep -E \"ATTEMPT|SUCCESS|SKIP|FAIL:|EXHAUSTED|Quality insufficient\" $MONITOR_LOG 2>/dev/null | tail -15; echo; echo \"=== GPU ===\"; nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader 2>/dev/null'" Enter
 
-        if ! is_training_running; then
-            echo "$(date): Training ended, checking results..."
-            break
-        fi
+else
+    # --- Single video mode ---
+    SCENE_NAME=$(basename "$OUTPUT_PATH")
+    MONITOR_LOG="${PROJECT_DIR}/outputs/logs/${SCENE_NAME}_${TIMESTAMP}.log"
+    mkdir -p "$(dirname "$MONITOR_LOG")"
 
-        # Quick progress check
-        if [ -f "$TRAIN_LOG" ]; then
-            latest=$(grep -E "ITER [0-9]+" "$TRAIN_LOG" 2>/dev/null | tail -1 | grep -oP "ITER \K[0-9]+" || echo "0")
-            echo "$(date): Training in progress... iteration $latest"
-        fi
-    done
+    DOCKER_INPUT="/EDGS/data/$(echo "$INPUT_VIDEO" | sed 's|.*/data/||')"
+    DOCKER_OUTPUT="/EDGS/outputs/$(echo "$OUTPUT_PATH" | sed 's|.*/outputs/||')"
 
-    # Check for OOM error
-    if check_for_oom "$TRAIN_LOG"; then
-        echo "$(date): OOM detected! Switching to lower memory config..."
-        config_idx=$((config_idx + 1))
-        if [ $config_idx -ge ${#CONFIGS[@]} ]; then
-            echo "$(date): ERROR: All configs exhausted, cannot reduce memory further!"
-            config_idx=$((${#CONFIGS[@]} - 1))  # Stay at lowest
-        fi
-        continue
-    fi
+    MONITOR_CMD="bash script/edgs_monitor.sh '$DOCKER_INPUT' '$DOCKER_OUTPUT'"
+    [ -n "$FLAG_360" ] && MONITOR_CMD="$MONITOR_CMD --360"
+    MONITOR_CMD="$MONITOR_CMD --colmap-config '$DEFAULT_COLMAP_CONFIG'"
+    MONITOR_CMD="$MONITOR_CMD --train-config '$DEFAULT_CONFIG'"
+    MONITOR_CMD="$MONITOR_CMD --max-retries $MAX_RETRIES"
 
-    # Check PSNR
-    psnr=$(get_psnr "$TRAIN_LOG")
-    ply_size=$(get_ply_size "$OUTPUT_PATH")
+    echo "=============================================="
+    echo "EDGS Training in Tmux (Auto-retry)"
+    echo "=============================================="
+    echo "Session:    $SESSION_NAME"
+    echo "Input:      $INPUT_VIDEO"
+    echo "Output:     $OUTPUT_PATH"
+    echo "360 mode:   ${FLAG_360:-No}"
+    echo "Config:     $DEFAULT_CONFIG"
+    echo "COLMAP:     $DEFAULT_COLMAP_CONFIG"
+    echo "Quality:    PSNR>=25 SSIM>=0.80 LPIPS<=0.18"
+    echo "Log:        $MONITOR_LOG"
+    echo "=============================================="
 
-    echo "$(date): Results - PSNR: $psnr, PLY size: $ply_size bytes"
+    # Create tmux session
+    tmux new-session -d -s "$SESSION_NAME" -n training -c "$PROJECT_DIR"
+    tmux send-keys -t "${SESSION_NAME}:training" "cd $PROJECT_DIR && docker compose exec -T edgs-app bash -c \"$MONITOR_CMD\" 2>&1 | tee '$MONITOR_LOG'" Enter
 
-    # Check if PSNR meets threshold
-    if [ -n "$psnr" ] && [ "$psnr" != "0" ]; then
-        passed=$(echo "$psnr >= $MIN_PSNR" | bc -l 2>/dev/null || echo "0")
-        if [ "$passed" = "1" ]; then
-            echo ""
-            echo "=============================================="
-            echo "$(date): SUCCESS! PSNR=$psnr >= $MIN_PSNR"
-            echo "Output: $OUTPUT_PATH"
-            echo "PLY size: $ply_size bytes"
-            echo "=============================================="
-            exit 0
-        fi
-    fi
+    # Status window
+    tmux new-window -t "$SESSION_NAME" -n status -c "$PROJECT_DIR"
+    tmux send-keys -t "${SESSION_NAME}:status" "watch -n 30 'echo \"=== Quality Monitor ===\"; grep -E \"ATTEMPT|PSNR|SUCCESS|FAIL:|Diagnosis|deficit|Gaussians\" $MONITOR_LOG 2>/dev/null | tail -15; echo; echo \"=== GPU ===\"; nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader 2>/dev/null'" Enter
+fi
 
-    # PSNR too low or missing, analyze and retry
-    echo "$(date): PSNR=$psnr < $MIN_PSNR, analyzing failure..."
-
-    # If PLY is very small, likely init failed
-    if [ "$ply_size" -lt 1000000 ]; then
-        echo "$(date): PLY file too small ($ply_size bytes), possible init failure"
-        # Don't change config, just retry
-    else
-        echo "$(date): Training completed but quality insufficient"
-        # Keep same config but retry
-    fi
-done
-
-echo ""
-echo "=============================================="
-echo "$(date): FAILED after $MAX_RETRIES attempts"
-echo "Best PSNR achieved: $psnr"
-echo "=============================================="
-exit 1
-MONITOR_SCRIPT
-
-chmod +x "${PROJECT_DIR}/script/edgs_monitor.sh"
-
-# Create tmux session
-tmux new-session -d -s "$SESSION_NAME" -n training -c "$PROJECT_DIR"
-
-# Start monitor script in the training window
-tmux send-keys -t "${SESSION_NAME}:training" "bash script/edgs_monitor.sh '$INPUT_VIDEO' '$OUTPUT_PATH' '$FLAG_360' '$MIN_PSNR' '$MONITOR_INTERVAL' '$MAX_RETRIES' '$TRAIN_LOG' '$DEFAULT_CONFIG' '$DEFAULT_COLMAP_CONFIG' 2>&1 | tee $MONITOR_LOG" Enter
-
-# Create status window
-tmux new-window -t "$SESSION_NAME" -n status -c "$PROJECT_DIR"
-tmux send-keys -t "${SESSION_NAME}:status" "watch -n 30 'echo \"=== Training Progress ===\"; tail -5 $TRAIN_LOG 2>/dev/null | grep -E \"ITER|PSNR|Error\" | tail -3; echo; echo \"=== Monitor ===\"; tail -10 $MONITOR_LOG 2>/dev/null; echo; echo \"=== GPU ===\"; nvidia-smi --query-gpu=memory.used,memory.free --format=csv,noheader 2>/dev/null'" Enter
-
-# Create log tail window
-tmux new-window -t "$SESSION_NAME" -n logs -c "$PROJECT_DIR"
-tmux send-keys -t "${SESSION_NAME}:logs" "tail -f $TRAIN_LOG" Enter
-
-# Select training window
 tmux select-window -t "${SESSION_NAME}:training"
 
 echo ""
-echo "Training started in tmux session: $SESSION_NAME"
+echo "Started in tmux session: $SESSION_NAME"
 echo ""
-echo "Commands:"
-echo "  Attach to session:  tmux attach -t $SESSION_NAME"
-echo "  Detach from session: Ctrl+b, then d"
-echo "  Switch windows:      Ctrl+b, then n (next) or p (previous)"
-echo "  Kill session:        tmux kill-session -t $SESSION_NAME"
+echo "  Attach:   tmux attach -t $SESSION_NAME"
+echo "  Detach:   Ctrl+b, then d"
+echo "  Windows:  Ctrl+b, then n/p"
+echo "  Kill:     tmux kill-session -t $SESSION_NAME"
 echo ""
-echo "Windows:"
-echo "  0: training - Main training/monitor process"
-echo "  1: status   - Quick status view (updates every 30s)"
-echo "  2: logs     - Live training log"
-echo ""
-echo "Training will automatically retry until PSNR > $MIN_PSNR"
 echo "You can safely close this terminal."
 echo "=============================================="

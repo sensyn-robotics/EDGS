@@ -1,0 +1,68 @@
+# COLMAP Configuration: 08 - 360 Video 2fps
+# Based on colmap_07_360_optimized but with 2fps
+# Key optimizations:
+# - 5 perspective views per frame (front, right, back, left, top) with FOV overlap
+# - Max 1000 total images (= 200 frames × 5 faces)
+# - Single camera mode for identical intrinsics across all perspective views
+# - Sequential matching with vocab tree loop closure for interleaved frame ordering
+
+# Data type: video enables sequential matching for temporal neighbors
+# Images are ordered by frame (interleaved faces), so sequential covers same-frame + temporal overlap
+# Vocab tree matching adds loop closure on top
+data_type: video
+
+# Sequential matching overlap: with 5 faces/frame, overlap=15 covers 3 frames in each direction
+sequential_overlap: 15
+
+# Vocab tree for loop closure (matches distant frames that revisit same area)
+vocab_tree_path: /EDGS/data/vocab_tree_faiss_flickr100K_words256K.bin
+
+# 360-specific processing settings
+processing_360:
+  single_camera: true          # Force identical camera intrinsics for all views
+  output_square: true          # Output square images (not 2:1 aspect ratio)
+  min_output_size: 1024        # Minimum size for perspective views
+  max_total_images: 1000       # Cap total perspective images (= max_frames × 5 faces)
+
+# Video/Image preprocessing settings
+preprocessing:
+  target_fps: 2.0              # 2fps for good scene coverage
+  max_image_size: 1024         # 1024px for acceptable reconstruction quality
+
+sift_extraction:
+  max_num_features: 8192       # Good feature count for 360 reconstruction
+  max_image_size: 2048         # Allow larger images for better detail
+  first_octave: -1             # Enable super-resolution features
+  num_octaves: 4               # Standard octaves
+  octave_resolution: 3         # Standard resolution
+  peak_threshold: 0.0067       # COLMAP default
+  edge_threshold: 10           # COLMAP default
+  estimate_affine_shape: false
+  domain_size_pooling: false
+  upright: false
+
+sift_matching:
+  # More lenient matching for 360 views which may have perspective distortion differences
+  max_ratio: 0.85              # Slightly more lenient than default
+  max_distance: 0.75           # Slightly more lenient than default
+  cross_check: true
+  max_num_matches: 32768
+
+pipeline:
+  min_num_matches: 15
+  multiple_models: false       # Single model for 360 reconstruction
+  max_num_models: 1
+  max_model_overlap: 20
+  min_model_size: 10
+  extract_colors: true
+  num_threads: -1              # Use all threads
+
+mapper:
+  init_min_num_inliers: 15
+  init_max_error: 4.0
+  init_min_tri_angle: 2.0
+  abs_pose_min_num_inliers: 15
+  abs_pose_max_error: 8.0
+  abs_pose_min_inlier_ratio: 0.15
+  filter_max_reproj_error: 4.0
+  filter_min_tri_angle: 0.5
