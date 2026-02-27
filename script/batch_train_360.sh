@@ -72,27 +72,28 @@ for i in "${!VIDEO_FILES[@]}"; do
     echo "  Output: ${OUTPUT_DIR}"
     echo "=============================================="
 
-    # Check if already completed with good quality
-    LOG_FILE="${OUTPUT_DIR}_train.log"
-    if [ -f "$LOG_FILE" ]; then
-        last_test=$(grep -E "Evaluating test:.*PSNR=" "$LOG_FILE" 2>/dev/null | tail -1) || true
-        if [ -n "$last_test" ]; then
-            psnr=$(echo "$last_test" | grep -oP 'PSNR=\K[0-9.]+') || psnr="0"
-            ssim=$(echo "$last_test" | grep -oP 'SSIM=\K[0-9.]+') || ssim="0"
-            lpips=$(echo "$last_test" | grep -oP 'LPIPS_splat=\K[0-9.]+') || lpips="1"
-            pass=$(python3 -c "
+    # Check if already completed with good quality (check both last and best logs)
+    for CHECK_LOG in "${OUTPUT_DIR}_train.log" "${OUTPUT_DIR}_best_train.log"; do
+        if [ -f "$CHECK_LOG" ]; then
+            last_test=$(grep -E "Evaluating test:.*PSNR=" "$CHECK_LOG" 2>/dev/null | tail -1) || true
+            if [ -n "$last_test" ]; then
+                psnr=$(echo "$last_test" | grep -oP 'PSNR=\K[0-9.]+') || psnr="0"
+                ssim=$(echo "$last_test" | grep -oP 'SSIM=\K[0-9.]+') || ssim="0"
+                lpips=$(echo "$last_test" | grep -oP 'LPIPS_splat=\K[0-9.]+') || lpips="1"
+                pass=$(python3 -c "
 p = float('$psnr') >= $MIN_PSNR
 s = float('$ssim') >= $MIN_SSIM
 l = float('$lpips') <= $MAX_LPIPS
 print(1 if p and s and l else 0)
 ")
-            if [ "$pass" = "1" ]; then
-                echo "  SKIP: Already meets quality (PSNR=${psnr} SSIM=${ssim} LPIPS=${lpips})"
-                SKIPPED=$((SKIPPED + 1))
-                continue
+                if [ "$pass" = "1" ]; then
+                    echo "  SKIP: Already meets quality (PSNR=${psnr} SSIM=${ssim} LPIPS=${lpips}) [$(basename "$CHECK_LOG")]"
+                    SKIPPED=$((SKIPPED + 1))
+                    continue 2
+                fi
             fi
         fi
-    fi
+    done
 
     START_TIME=$(date +%s)
 

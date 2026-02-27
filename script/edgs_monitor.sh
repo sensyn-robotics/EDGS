@@ -244,15 +244,58 @@ check_for_oom() {
     grep -q "OutOfMemoryError\|CUDA out of memory\|Killed" "$1" 2>/dev/null
 }
 
+# --- Best result tracking ---
+# Extracts test PSNR from log as a comparable float (returns "0" if unavailable)
+get_test_psnr() {
+    local log="$1"
+    local last_test
+    last_test=$(grep -E "Evaluating test:.*PSNR=" "$log" 2>/dev/null | tail -1) || true
+    if [ -n "$last_test" ]; then
+        echo "$last_test" | grep -oP 'PSNR=\K[0-9.]+' || echo "0"
+    else
+        echo "0"
+    fi
+}
+
+# Copies current training result to best directory if PSNR improved
+update_best_result() {
+    local current_psnr="$1"
+    local is_better
+    is_better=$(python3 -c "print(1 if float('$current_psnr') > float('$BEST_PSNR') else 0)")
+
+    if [ "$is_better" = "1" ]; then
+        echo "  NEW BEST: PSNR ${current_psnr} > previous ${BEST_PSNR}"
+        BEST_PSNR="$current_psnr"
+
+        # Copy training artifacts to best directory
+        rm -rf "$BEST_DIR" 2>/dev/null || true
+        mkdir -p "$BEST_DIR"
+        # Copy point clouds and model files
+        [ -d "$OUTPUT_PATH/point_cloud" ] && cp -r "$OUTPUT_PATH/point_cloud" "$BEST_DIR/"
+        for f in input.ply cameras.json exposure.json train_config.yaml; do
+            [ -f "$OUTPUT_PATH/$f" ] && cp "$OUTPUT_PATH/$f" "$BEST_DIR/"
+        done
+        # Copy training log
+        [ -f "$LOG_FILE" ] && cp "$LOG_FILE" "$BEST_LOG"
+
+        echo "  Saved best result to: $BEST_DIR"
+    else
+        echo "  No improvement: PSNR ${current_psnr} <= best ${BEST_PSNR}"
+    fi
+}
+
 # --- Main ---
 SCENE_NAME=$(basename "$OUTPUT_PATH")
 LOG_FILE="${OUTPUT_PATH}_train.log"
+BEST_DIR="${OUTPUT_PATH}_best"
+BEST_LOG="${OUTPUT_PATH}_best_train.log"
+BEST_PSNR="0"
 
 echo "=============================================="
 echo "EDGS Quality Monitor"
 echo "=============================================="
 echo "Input:       $(basename "$INPUT_VIDEO")"
-echo "Output:      $OUTPUT_PATH"
+echo "Output:      $OUTPUT_PATH (last) / ${BEST_DIR} (best)"
 echo "360 mode:    ${FLAG_360:-no}"
 echo "COLMAP:      $COLMAP_CONFIG"
 echo "Train base:  $TRAIN_CONFIG"
@@ -330,12 +373,16 @@ while [ $attempt -lt $MAX_RETRIES ]; do
     quality_output=$(check_quality "$LOG_FILE") && quality_status=0 || quality_status=$?
     echo "$quality_output"
 
+    # Track best result across all attempts
+    current_psnr=$(get_test_psnr "$LOG_FILE")
+    update_best_result "$current_psnr"
+
     if [ $quality_status -eq 0 ]; then
         echo ""
         echo "=============================================="
         echo "$(date '+%Y-%m-%d %H:%M:%S'): SUCCESS after ${attempt} attempts!"
         echo "  ${quality_output}"
-        echo "  Output: ${OUTPUT_PATH}"
+        echo "  Output: ${OUTPUT_PATH} (last) / ${BEST_DIR} (best)"
         echo "=============================================="
         exit 0
     fi
@@ -353,5 +400,7 @@ echo ""
 echo "=============================================="
 echo "$(date '+%Y-%m-%d %H:%M:%S'): EXHAUSTED ${MAX_RETRIES} attempts"
 echo "  Last metrics: $(check_quality "$LOG_FILE" 2>/dev/null || echo 'unavailable')"
+echo "  Best PSNR: ${BEST_PSNR}"
+echo "  Best result: ${BEST_DIR}"
 echo "=============================================="
 exit 1
