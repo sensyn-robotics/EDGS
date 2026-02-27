@@ -55,6 +55,14 @@ class EDGSTrainer:
         self.timer = Timer()
         self.log_wandb = log_wandb
 
+        # Gaussian count cap: ~3M per 12GB VRAM, scaled to available GPU memory
+        try:
+            total_vram = torch.cuda.get_device_properties(device).total_mem
+            self.max_gaussians = int(3_000_000 * (total_vram / (12 * 1024**3)))
+            self.CONSOLE.print(f"Gaussian cap: {self.max_gaussians:,} (based on {total_vram / 1024**3:.1f}GB VRAM)", style="info")
+        except Exception:
+            self.max_gaussians = 3_000_000  # safe default
+
     def load_checkpoints(self, load_cfg):
         # Load 3DGS checkpoint
         if load_cfg.gs:
@@ -190,11 +198,36 @@ class EDGSTrainer:
         self.GS_optimizer.zero_grad(set_to_none=True)
         return render_pkg["radii"]
 
+    def _should_skip_densification(self):
+        """Check if densification should be skipped due to resource limits."""
+        n_gaussians = len(self.GS.gaussians._xyz)
+        if n_gaussians > self.max_gaussians:
+            self.CONSOLE.print(
+                f"[SAFETY] Gaussian count {n_gaussians:,} exceeds cap {self.max_gaussians:,} — skipping densification",
+                style="warning")
+            return True
+        try:
+            allocated = torch.cuda.memory_allocated()
+            total = torch.cuda.get_device_properties(self.device).total_mem
+            usage_pct = allocated / total
+            if usage_pct > 0.90:
+                self.CONSOLE.print(
+                    f"[SAFETY] VRAM usage {usage_pct:.0%} > 90% — skipping densification",
+                    style="warning")
+                return True
+        except Exception:
+            pass
+        return False
+
     def densify_and_prune(self, radii = None):
         # Densification or pruning
         if self.gs_step < self.training_config.densify_until_iter:
             if (self.gs_step > self.training_config.densify_from_iter) and \
                     (self.gs_step % self.training_config.densification_interval == 0):
+                if self._should_skip_densification():
+                    # Over resource limits — prune only, skip densification
+                    self.prune(radii)
+                    return
                 size_threshold = 20 if self.gs_step > self.training_config.opacity_reset_interval else None
                 self.GS.gaussians.densify_and_prune(self.training_config.densify_grad_threshold,
                                                                0.005,
@@ -202,7 +235,7 @@ class EDGSTrainer:
                                                                size_threshold, radii)
             if self.gs_step % self.training_config.opacity_reset_interval == 0 or (
                     self.dataset_white_background and self.gs_step == self.training_config.densify_from_iter):
-                self.GS.gaussians.reset_opacity()             
+                self.GS.gaussians.reset_opacity()
 
           
 

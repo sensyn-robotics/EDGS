@@ -91,43 +91,43 @@ retry_overrides() {
     local level=$1
     case $level in
         0)
-            # Baseline: 30k iters, standard densification
+            # Baseline: 30k iters, standard densification (500-15k)
             echo ""
             ;;
         1)
-            # More iterations, still with densification
+            # More iterations, standard densification
             echo "$ITER_60K $SAVE_60K"
             ;;
         2)
-            # No densification — OOM safe, often better for dense init
+            # No densification — diagnostic fallback (only no-densify level)
             echo "$ITER_60K $SAVE_60K $NO_DENSIFY"
             ;;
         3)
-            # Extended densification (to 30k) + gentler thresholds + frequent opacity reset
-            echo "$ITER_60K $SAVE_60K $DENSIFY_EXTENDED $DENSIFY_GENTLE $OPACITY_FREQ"
+            # Extended densification window (to 30k) + more correspondences
+            echo "$ITER_60K $SAVE_60K $DENSIFY_EXTENDED $CORR_MEDIUM"
             ;;
         4)
-            # 90k iters, no densify, more correspondence points
-            echo "$ITER_90K $SAVE_90K $NO_DENSIFY $CORR_MEDIUM"
+            # 90k iters, standard densification, more correspondences, perceptual loss
+            echo "$ITER_90K $SAVE_90K $CORR_MEDIUM $DSSIM_04"
             ;;
         5)
-            # 90k iters, no densify, more correspondences, higher DSSIM weight for perceptual quality
-            echo "$ITER_90K $SAVE_90K $NO_DENSIFY $CORR_MEDIUM $DSSIM_04"
+            # 90k iters, extended densification + more correspondences + perceptual
+            echo "$ITER_90K $SAVE_90K $DENSIFY_EXTENDED $CORR_MEDIUM $DSSIM_04"
             ;;
         6)
-            # 90k iters, extended densification + gentle + more correspondences
-            echo "$ITER_90K $SAVE_90K $DENSIFY_EXTENDED $DENSIFY_GENTLE $CORR_MEDIUM $OPACITY_FREQ"
+            # 90k iters, extended densification + max correspondences + SfM init
+            echo "$ITER_90K $SAVE_90K $DENSIFY_EXTENDED $CORR_HIGH $SFM_INIT"
             ;;
         7)
-            # 120k iters, no densify, max correspondences
-            echo "$ITER_120K $SAVE_120K $NO_DENSIFY $CORR_HIGH"
+            # 120k iters, standard densification, max correspondences, high DSSIM
+            echo "$ITER_120K $SAVE_120K $CORR_HIGH $DSSIM_05"
             ;;
         8)
-            # 120k iters, no densify, max correspondences + combined SfM init + high DSSIM
-            echo "$ITER_120K $SAVE_120K $NO_DENSIFY $CORR_HIGH $DSSIM_05 $SFM_INIT"
+            # 120k iters, extended densification + max corr + SfM + high DSSIM
+            echo "$ITER_120K $SAVE_120K $DENSIFY_EXTENDED $CORR_HIGH $DSSIM_05 $SFM_INIT"
             ;;
         9)
-            # 120k iters, long gentle densification + max correspondences + SfM + high DSSIM + freq opacity reset
+            # Maximum effort: long gentle densification + max corr + SfM + high DSSIM + freq reset
             echo "$ITER_120K $SAVE_120K $DENSIFY_LONG $DENSIFY_GENTLE $CORR_HIGH $DSSIM_05 $SFM_INIT $OPACITY_FREQ"
             ;;
     esac
@@ -138,13 +138,13 @@ retry_description() {
     case $level in
         0) echo "baseline (30k, densify)" ;;
         1) echo "60k, densify" ;;
-        2) echo "60k, no densify" ;;
-        3) echo "60k, extended densify(30k), gentle thresholds, freq opacity reset" ;;
-        4) echo "90k, no densify, more correspondences(15k/180)" ;;
-        5) echo "90k, no densify, more corr, higher DSSIM(0.4)" ;;
-        6) echo "90k, extended densify(30k), gentle, more corr, freq opacity reset" ;;
-        7) echo "120k, no densify, max correspondences(20k/240/5nns)" ;;
-        8) echo "120k, no densify, max corr, SfM+RoMa init, DSSIM(0.5)" ;;
+        2) echo "60k, no densify (diagnostic)" ;;
+        3) echo "60k, extended densify(30k), more corr(15k/180)" ;;
+        4) echo "90k, densify, more corr(15k/180), DSSIM(0.4)" ;;
+        5) echo "90k, extended densify(30k), more corr, DSSIM(0.4)" ;;
+        6) echo "90k, extended densify(30k), max corr(20k/240/5nns), SfM init" ;;
+        7) echo "120k, densify, max corr, DSSIM(0.5)" ;;
+        8) echo "120k, extended densify(30k), max corr, SfM, DSSIM(0.5)" ;;
         9) echo "120k, long densify(45k), gentle, max corr, SfM, DSSIM(0.5), freq reset" ;;
     esac
 }
@@ -241,7 +241,62 @@ check_quality() {
 }
 
 check_for_oom() {
-    grep -q "OutOfMemoryError\|CUDA out of memory\|Killed" "$1" 2>/dev/null
+    local log="$1"
+    local exit_code="${2:-0}"
+    # Standard OOM patterns
+    grep -q "OutOfMemoryError\|CUDA out of memory\|Killed" "$log" 2>/dev/null && return 0
+    # Watchdog kill marker
+    grep -q "VRAM_WATCHDOG_KILL" "$log" 2>/dev/null && return 0
+    # Exit code 137 = OOM killer
+    [ "$exit_code" -eq 137 ] 2>/dev/null && return 0
+    # Non-zero exit with no test metrics (likely crashed from resource exhaustion)
+    if [ "$exit_code" -ne 0 ] 2>/dev/null; then
+        if ! grep -q "Evaluating test:.*PSNR=" "$log" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    return 1
+}
+
+# --- GPU VRAM watchdog ---
+# Monitors VRAM usage and kills the training process if it stays >= 95% for 60s
+WATCHDOG_PID=""
+
+start_vram_watchdog() {
+    local train_pid="$1"
+    local log_file="$2"
+
+    (
+        consecutive_high=0
+        while kill -0 "$train_pid" 2>/dev/null; do
+            sleep 30
+            # Get VRAM usage percentage from nvidia-smi
+            vram_pct=$(nvidia-smi --query-gpu=memory.used,memory.total \
+                --format=csv,noheader,nounits 2>/dev/null | head -1 | \
+                awk -F',' '{printf "%.0f", ($1/$2)*100}') || continue
+            if [ "$vram_pct" -ge 95 ] 2>/dev/null; then
+                consecutive_high=$((consecutive_high + 1))
+                if [ "$consecutive_high" -ge 2 ]; then
+                    echo "[VRAM_WATCHDOG_KILL] VRAM at ${vram_pct}% for 60s+ — killing PID ${train_pid}" >> "$log_file"
+                    kill -TERM "$train_pid" 2>/dev/null || true
+                    sleep 5
+                    kill -KILL "$train_pid" 2>/dev/null || true
+                    exit 0
+                fi
+            else
+                consecutive_high=0
+            fi
+        done
+    ) &
+    WATCHDOG_PID=$!
+}
+
+stop_vram_watchdog() {
+    if [ -n "$WATCHDOG_PID" ]; then
+        kill "$WATCHDOG_PID" 2>/dev/null || true
+        wait "$WATCHDOG_PID" 2>/dev/null || true
+        WATCHDOG_PID=""
+    fi
 }
 
 # --- Best result tracking ---
@@ -311,18 +366,8 @@ had_oom=false
 while [ $attempt -lt $MAX_RETRIES ]; do
     attempt=$((attempt + 1))
 
-    # Skip densification levels if we've had OOM
-    if [ "$had_oom" = true ]; then
-        # Check if this level uses densification (doesn't contain no_densify)
-        local_overrides=$(retry_overrides $retry_level)
-        while [ $retry_level -lt 9 ] && \
-              echo "$local_overrides" | grep -qv "no_densify" && \
-              [ -n "$local_overrides" ]; do
-            echo "  Skipping level ${retry_level} (has densification, previous OOM)"
-            retry_level=$((retry_level + 1))
-            local_overrides=$(retry_overrides $retry_level)
-        done
-    fi
+    # Note: densification levels are safe after OOM thanks to Gaussian count cap
+    # and VRAM guard in trainer.py — no need to skip them
 
     overrides=$(retry_overrides $retry_level)
     desc=$(retry_description $retry_level)
@@ -350,20 +395,24 @@ while [ $attempt -lt $MAX_RETRIES ]; do
 
     echo "  CMD: $CMD"
 
-    # Run training (capture output to log)
+    # Run training (capture output to log) with VRAM watchdog
     START_TIME=$(date +%s)
-    eval "$CMD" > "$LOG_FILE" 2>&1 && EXIT_CODE=0 || EXIT_CODE=$?
+    eval "$CMD" > "$LOG_FILE" 2>&1 &
+    TRAIN_PID=$!
+    start_vram_watchdog "$TRAIN_PID" "$LOG_FILE"
+    wait "$TRAIN_PID" && EXIT_CODE=0 || EXIT_CODE=$?
+    stop_vram_watchdog
     END_TIME=$(date +%s)
     ELAPSED=$(( (END_TIME - START_TIME) / 60 ))
 
     echo "$(date '+%Y-%m-%d %H:%M:%S'): Training exited (code=${EXIT_CODE}) after ${ELAPSED} min"
 
-    # Check for OOM
-    if check_for_oom "$LOG_FILE"; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S'): OOM detected!"
+    # Check for OOM (pass exit code for 137 detection)
+    if check_for_oom "$LOG_FILE" "$EXIT_CODE"; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S'): OOM/resource exhaustion detected (exit code=${EXIT_CODE})!"
         had_oom=true
         retry_level=$((retry_level + 1))
-        echo "  Advancing to retry level ${retry_level} (will skip densification levels)"
+        echo "  Advancing to retry level ${retry_level}"
         continue
     fi
 
