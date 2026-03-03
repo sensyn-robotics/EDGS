@@ -245,8 +245,8 @@ check_for_oom() {
     local exit_code="${2:-0}"
     # Standard OOM patterns
     grep -q "OutOfMemoryError\|CUDA out of memory\|Killed" "$log" 2>/dev/null && return 0
-    # Watchdog kill marker
-    grep -q "VRAM_WATCHDOG_KILL" "$log" 2>/dev/null && return 0
+    # Watchdog kill markers
+    grep -q "VRAM_WATCHDOG_KILL\|RAM_WATCHDOG_KILL" "$log" 2>/dev/null && return 0
     # Exit code 137 = OOM killer
     [ "$exit_code" -eq 137 ] 2>/dev/null && return 0
     # Non-zero exit with no test metrics (likely crashed from resource exhaustion)
@@ -296,6 +296,46 @@ stop_vram_watchdog() {
         kill "$WATCHDOG_PID" 2>/dev/null || true
         wait "$WATCHDOG_PID" 2>/dev/null || true
         WATCHDOG_PID=""
+    fi
+}
+
+# --- System RAM watchdog ---
+# Monitors system RAM usage and kills training if it stays >= 85% for 90s.
+# This prevents the system from freezing due to swap thrashing on low-swap systems.
+RAM_WATCHDOG_PID=""
+
+start_ram_watchdog() {
+    local train_pid="$1"
+    local log_file="$2"
+
+    (
+        consecutive_high=0
+        while kill -0 "$train_pid" 2>/dev/null; do
+            sleep 30
+            # Get RAM usage percentage from /proc/meminfo
+            ram_pct=$(awk '/MemTotal/{t=$2} /MemAvailable/{a=$2} END{printf "%.0f", ((t-a)/t)*100}' /proc/meminfo 2>/dev/null) || continue
+            if [ "$ram_pct" -ge 85 ] 2>/dev/null; then
+                consecutive_high=$((consecutive_high + 1))
+                if [ "$consecutive_high" -ge 3 ]; then
+                    echo "[RAM_WATCHDOG_KILL] System RAM at ${ram_pct}% for 90s+ — killing PID ${train_pid}" >> "$log_file"
+                    kill -TERM "$train_pid" 2>/dev/null || true
+                    sleep 5
+                    kill -KILL "$train_pid" 2>/dev/null || true
+                    exit 0
+                fi
+            else
+                consecutive_high=0
+            fi
+        done
+    ) &
+    RAM_WATCHDOG_PID=$!
+}
+
+stop_ram_watchdog() {
+    if [ -n "$RAM_WATCHDOG_PID" ]; then
+        kill "$RAM_WATCHDOG_PID" 2>/dev/null || true
+        wait "$RAM_WATCHDOG_PID" 2>/dev/null || true
+        RAM_WATCHDOG_PID=""
     fi
 }
 
@@ -400,8 +440,10 @@ while [ $attempt -lt $MAX_RETRIES ]; do
     eval "$CMD" > "$LOG_FILE" 2>&1 &
     TRAIN_PID=$!
     start_vram_watchdog "$TRAIN_PID" "$LOG_FILE"
+    start_ram_watchdog "$TRAIN_PID" "$LOG_FILE"
     wait "$TRAIN_PID" && EXIT_CODE=0 || EXIT_CODE=$?
     stop_vram_watchdog
+    stop_ram_watchdog
     END_TIME=$(date +%s)
     ELAPSED=$(( (END_TIME - START_TIME) / 60 ))
 

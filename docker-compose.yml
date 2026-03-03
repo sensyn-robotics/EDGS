@@ -22,5 +22,8 @@ services:
       - ./configs:/EDGS/configs # Example: map a local 'config' folder
       - ./notebooks:/EDGS/notebooks # Map a local 'notebooks' folder for JupyterLab
       - ./submodules:/EDGS/submodules # Map submodules for gaussian-splatting and RoMa
+    mem_limit: 24g        # Cap container memory so OOM killer targets it, not the whole system
+    memswap_limit: 24g    # No swap for container (same as mem_limit = no extra swap)
+    shm_size: 2g          # Shared memory for PyTorch DataLoader workers
     stdin_open: true # Keep STDIN open for interactive processes
     tty: true        # Allocate a TTY
