@@ -36,7 +36,8 @@ gs:
     rotation_lr: 0.001     # Standard rotation learning
     
     # Loss weighting for better structural quality
-    lambda_dssim: 0.2  #  High structure similarity(SSIM) weight can cause blurriness in scenes with fine details.
+    lambda_dssim: 0.4
+    densify_until_iter: 45000
     
     # Save checkpoints for evaluation
     save_iterations: [30000, 60000, 90000, 120000, 150000]
@@ -48,9 +49,9 @@ gs:
 # Maximum quality EDGS initialization
 init_wC:
   use: True  # Enable EDGS correlation-based initialization
-  matches_per_ref: 30000    #  reduce if getting too many bad matche
-  num_refs: 600            # Use more reference views for coverage
-  nns_per_ref: 10          # More nearest neighbors for dense coverage
+  matches_per_ref: 20000
+  num_refs: 240
+  nns_per_ref: 5           # Safe on A100, 10 causes OOM
   scaling_factor: 0.001   # larger initial gaussian size
   proj_err_tolerance: 0.01  # same with default projection error for quality
   roma_model: "outdoors"   # Use appropriate model (change to "indoors" if needed)

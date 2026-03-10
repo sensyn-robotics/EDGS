@@ -8,8 +8,8 @@ defaults:
 
 # EDGS core - selective densification control
 train:
-  no_densify: True  # Pure EDGS without densification for memory efficiency
-  gs_epochs: 30000   # Increased iterations for better convergence
+  no_densify: False  # Enable densification for quality
+  gs_epochs: 60000
   reduce_opacity: True
   max_lr: True
 
@@ -21,7 +21,7 @@ gs:
     
     # Densification control - very conservative
     densify_from_iter: 2000      # Start later
-    densify_until_iter: 10000    # Stop earlier 
+    densify_until_iter: 20000
     densify_grad_threshold: 0.001  # Higher threshold (less aggressive)
     percent_dense: 0.005         # Reduced density percentage
     densification_interval: 200  # Less frequent densification
@@ -33,7 +33,7 @@ gs:
     position_lr_init: 0.00016      # Slightly reduced for stability
     position_lr_final: 0.0000016   # 
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 20000
+    position_lr_max_steps: 60000
     
     # Enhanced learning rates for better quality
     feature_lr: 0.0025      # Balanced feature learning
@@ -42,7 +42,9 @@ gs:
     rotation_lr: 0.001      # Balanced rotation learning
     
     # Save more checkpoints for monitoring
-    save_iterations: [5000, 10000, 15000, 20000]
+    iterations: 60000
+    lambda_dssim: 0.35
+    save_iterations: [3000, 7000, 15000, 30000, 60000]
 
 # Enable EDGS correlation with reduced memory footprint
 init_wC:

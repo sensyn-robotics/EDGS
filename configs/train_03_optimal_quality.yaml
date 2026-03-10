@@ -9,13 +9,18 @@ defaults:
 # EDGS core settings
 train:
   no_densify: False  # Enable densification for optimal quality
-  gs_epochs: 60000  # Full training iterations
+  gs_epochs: 90000  # Full training iterations
   reduce_opacity: True
   max_lr: True
 
 # Gaussian Splatting optimization
 gs:
   opt:
+    iterations: 90000
+    densify_until_iter: 30000
+    lambda_dssim: 0.4
+    save_iterations: [3000, 7000, 15000, 30000, 60000, 90000]
+
     # Optimal batch size for quality
     batch_size: 12
     
@@ -26,7 +31,7 @@ gs:
     position_lr_init: 0.00032
     position_lr_final: 0.0000032
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 30000
+    position_lr_max_steps: 90000
     
     feature_lr: 0.0045
     opacity_lr: 0.09
@@ -38,7 +43,7 @@ init_wC:
   use: True  # Use EDGS correlation initialization
   matches_per_ref: 15000
   num_refs: 180
-  nns_per_ref: 5
+  nns_per_ref: 3
   scaling_factor: 0.0005
   proj_err_tolerance: 0.005
   add_SfM_init: False

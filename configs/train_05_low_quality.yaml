@@ -9,7 +9,7 @@ defaults:
 # EDGS core - disable densification to save memory
 train:
   no_densify: True  # Pure EDGS approach for consistent memory usage
-  gs_epochs: 30000   # Even more epochs for convergence with densification
+  gs_epochs: 45000
   reduce_opacity: True  # Help clean up bad gaussians
   max_lr: True  # Use max learning rate for better convergence
 
@@ -27,7 +27,7 @@ gs:
     position_lr_init: 0.00024      # Increased for better convergence with EDGS
     position_lr_final: 0.0000002   # Very fine final adjustments
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 75000   # Extended for 80k iterations
+    position_lr_max_steps: 45000
     
     # Other learning rates optimized for EDGS
     feature_lr: 0.0035    # Moderate increase for better features
@@ -37,16 +37,15 @@ gs:
     
     # Controlled densification for quality without memory explosion
     densify_from_iter: 10000        # Start densification later
-    densify_until_iter: 40000       # Continue longer for better quality
+    densify_until_iter: 15000
     densify_grad_threshold: 0.0005  # Higher threshold = more selective
     percent_dense: 0.002            # Very conservative densification rate
     densification_interval: 500     # Less frequent to save memory
     
     # Save more checkpoints for monitoring long training
-    save_iterations: [20000, 40000, 60000, 80000]
-    
-    # Increase SSIM weight for better structural quality
-    lambda_dssim: 0.2  # Reset to default since we're enabling densification
+    iterations: 45000
+    lambda_dssim: 0.3
+    save_iterations: [3000, 7000, 15000, 30000, 45000]
 
 # Disable EDGS correlation to avoid OOM on 12GB GPU
 init_wC:

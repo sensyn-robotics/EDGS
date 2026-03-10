@@ -27,6 +27,8 @@ gs:
     position_lr_init: 0.00008      # Very low for stability
     position_lr_final: 0.0000008   # Proportionally lower
     position_lr_delay_mult: 0.01
+    iterations: 30000
+    lambda_dssim: 0.3
     position_lr_max_steps: 30000
     
     # Minimal learning rates for stability
