@@ -16,6 +16,8 @@ train:
 # Memory-optimized Gaussian Splatting settings
 gs:
   sh_degree: 1  # Keep at 1 for now, SH degree 2 + EDGS correlation too memory intensive
+  dataset:
+    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
   opt:
     # Minimal batch size to avoid CUDA OOM
     batch_size: 1  # Extreme reduction for RTX 4080 Laptop constraints

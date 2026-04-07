@@ -8,8 +8,8 @@ defaults:
 
 # EDGS core settings
 train:
-  no_densify: False  # Enable densification for optimal quality
-  gs_epochs: 90000  # Full training iterations
+  no_densify: True  # Enable densification for optimal quality
+  gs_epochs: 30000  # Full training iterations
   reduce_opacity: True
   max_lr: True
 
@@ -18,10 +18,10 @@ gs:
   dataset:
     data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
   opt:
-    iterations: 90000
+    iterations: 30000
     densify_until_iter: 30000
     lambda_dssim: 0.4
-    save_iterations: [3000, 7000, 15000, 30000, 60000, 90000]
+    save_iterations: [3000, 7000, 15000, 30000]
 
     # Optimal batch size for quality
     batch_size: 12
@@ -48,4 +48,4 @@ init_wC:
   nns_per_ref: 3
   scaling_factor: 0.0005
   proj_err_tolerance: 0.005
-  add_SfM_init: False
+  add_SfM_init: True

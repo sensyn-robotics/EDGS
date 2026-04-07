@@ -16,6 +16,8 @@ train:
 # Extreme memory reduction settings
 gs:
   sh_degree: 0  # Minimal SH (only DC) for maximum memory savings
+  dataset:
+    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
   opt:
     # Absolute minimal batch size
     batch_size: 1  # Ultimate reduction for RTX 4080 Laptop

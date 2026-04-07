@@ -16,6 +16,8 @@ train:
 # Balanced Gaussian Splatting settings
 gs:
   sh_degree: 1  # Increased from 0 to 1 for better lighting/color
+  dataset:
+    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
   opt:
     batch_size: 1  # Keep minimal for memory safety
     
