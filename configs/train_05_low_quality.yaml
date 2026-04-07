@@ -2,59 +2,39 @@ defaults:
   - train
   - _self_
 
-# LOW QUALITY configuration for EDGS ⭐⭐
-# Memory-safe settings for 8-12GB GPUs with long training
-# Conservative but extended training for acceptable quality
+# LOW QUALITY ⭐⭐
+# Target: 8-12GB GPUs, SfM-only init (no EDGS/RoMa)
 
-# EDGS core - disable densification to save memory
 train:
-  no_densify: True  # Pure EDGS approach for consistent memory usage
+  no_densify: True
   gs_epochs: 45000
-  reduce_opacity: True  # Help clean up bad gaussians
-  max_lr: True  # Use max learning rate for better convergence
+  reduce_opacity: True
+  max_lr: True
 
-# Memory-optimized Gaussian Splatting settings
 gs:
-  sh_degree: 1  # Keep at 1 for now, SH degree 2 + EDGS correlation too memory intensive
+  sh_degree: 1
   dataset:
-    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
+    data_device: cpu
   opt:
-    # Minimal batch size to avoid CUDA OOM
-    batch_size: 1  # Extreme reduction for RTX 4080 Laptop constraints
-    
-    # Opacity reset for cleanup without too much memory overhead
-    opacity_reset_interval: 5000  # More frequent cleanup for better quality
-    
-    # Optimized learning rates for EDGS convergence with longer training
-    position_lr_init: 0.00024      # Increased for better convergence with EDGS
-    position_lr_final: 0.0000002   # Very fine final adjustments
-    position_lr_delay_mult: 0.01
-    position_lr_max_steps: 45000
-    
-    # Other learning rates optimized for EDGS
-    feature_lr: 0.0035    # Moderate increase for better features
-    opacity_lr: 0.07      # Balanced opacity learning
-    scaling_lr: 0.003     # Moderate scaling learning
-    rotation_lr: 0.0015   # Balanced rotation learning
-    
-    # Controlled densification for quality without memory explosion
-    densify_from_iter: 10000        # Start densification later
-    densify_until_iter: 15000
-    densify_grad_threshold: 0.0005  # Higher threshold = more selective
-    percent_dense: 0.002            # Very conservative densification rate
-    densification_interval: 500     # Less frequent to save memory
-    
-    # Save more checkpoints for monitoring long training
     iterations: 45000
-    lambda_dssim: 0.3
-    save_iterations: [3000, 7000, 15000, 30000, 45000]
+    batch_size: 1
 
-# Disable EDGS correlation to avoid OOM on 12GB GPU
+    opacity_reset_interval: 8000
+
+    # Learning rates
+    position_lr_init: 0.00012
+    position_lr_final: 0.000003
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 40000
+
+    feature_lr: 0.002
+    opacity_lr: 0.03
+    scaling_lr: 0.002
+    rotation_lr: 0.0008
+
+    lambda_dssim: 0.3
+    save_iterations: [7000, 15000, 30000, 45000]
+
 init_wC:
-  use: False   # Disabled - EDGS correlation causes OOM on 12GB GPU
-  add_SfM_init: True  # Use SfM points only
-  matches_per_ref: 10000   
-  num_refs: 180           
-  nns_per_ref: 3          
-  scaling_factor: 0.001   
-  proj_err_tolerance: 0.01
+  use: False
+  add_SfM_init: True

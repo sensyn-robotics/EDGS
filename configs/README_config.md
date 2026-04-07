@@ -48,15 +48,21 @@ When `init_wC.use=False` (configs 05/06), EDGS init is skipped entirely and trai
 
 | Config | GPU | Epochs | Densify | Initialization | matches/ref | num_refs | nns | SH | Batch |
 |--------|-----|--------|---------|----------------|-------------|----------|-----|----|-------|
-| 01 highest | A100 | 150k | Yes | EDGS + SfM | 20,000 | 240 | 5 | 3 | 8 |
-| 02 high | 12-16GB | 100k | Yes | EDGS + SfM | 12,000 | 150 | 3 | 1 | 1 |
-| 03 optimal | 12-16GB | 90k | Yes | EDGS only | 15,000 | 180 | 3 | 3 | 12 |
+| 01 highest | A100 | 150k | Yes | EDGS + SfM | 20,000 | 240 | 5 | 3 | 12 |
+| 02 high | 16GB+ | 100k | Yes | EDGS + SfM | 15,000 | 180 | 3 | 3 | 8 |
+| 03 optimal | 12-16GB | 90k | Yes | EDGS + SfM | 12,000 | 150 | 3 | 3 | 4 |
 | 04 medium | 8-12GB | 60k | Yes | EDGS + SfM | 6,000 | 120 | 2 | 1 | 1 |
 | 05 low | 8-12GB | 45k | No | SfM only | — | — | — | 1 | 1 |
 | 06 lowest | 4-8GB | 30k | No | SfM only | — | — | — | 0 | 1 |
 
+All parameters decrease monotonically from 01 to 06.
+
+**What affects GPU memory:** `batch_size`, `sh_degree`, `data_device`, EDGS init params (more Gaussians = more VRAM), and densification (grows Gaussian count during training).
+
+**What affects quality via training budget:** Learning rates scale with iteration count — more iterations allow higher initial LR (more time to recover from overshooting) and lower final LR (more time for fine-grained convergence). Fewer iterations need conservative LRs since there's less training budget.
+
 **Notes:**
-- **Initialization**: "EDGS + SfM" = dense EDGS points + sparse SfM points. "EDGS only" = dense EDGS points, SfM removed. "SfM only" = EDGS disabled to avoid OOM.
+- **Initialization**: "EDGS + SfM" = dense EDGS points + sparse SfM points. "SfM only" = EDGS disabled to avoid OOM.
 - **Densify** (`train.no_densify`): Standard 3DGS densification during training. Disabled in 05/06 for consistent memory usage.
 - **SH degree**: 0 = DC only (flat color), 1 = basic view-dependence, 3 = full view-dependent effects.
 

@@ -2,58 +2,51 @@ defaults:
   - train
   - _self_
 
-# MEDIUM QUALITY configuration for EDGS ⭐⭐⭐
-# Good quality with memory efficiency for 8-12GB GPUs
-# Memory-conscious settings with reasonable training time
+# MEDIUM QUALITY ⭐⭐⭐
+# Target: 8-12GB GPUs
 
-# EDGS core - selective densification control
 train:
-  no_densify: False  # Enable densification for quality
+  no_densify: False
   gs_epochs: 60000
   reduce_opacity: True
   max_lr: True
 
-# Balanced Gaussian Splatting settings
 gs:
-  sh_degree: 1  # Increased from 0 to 1 for better lighting/color
+  sh_degree: 1
   dataset:
-    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
+    data_device: cpu
   opt:
-    batch_size: 1  # Keep minimal for memory safety
-    
-    # Densification control - very conservative
-    densify_from_iter: 2000      # Start later
-    densify_until_iter: 20000
-    densify_grad_threshold: 0.001  # Higher threshold (less aggressive)
-    percent_dense: 0.005         # Reduced density percentage
-    densification_interval: 200  # Less frequent densification
-    
-    # Opacity management
-    opacity_reset_interval: 8000  # More frequent cleanup
-    
-    # Optimized learning rates for quality
-    position_lr_init: 0.00016      # Slightly reduced for stability
-    position_lr_final: 0.0000016   # 
-    position_lr_delay_mult: 0.01
-    position_lr_max_steps: 60000
-    
-    # Enhanced learning rates for better quality
-    feature_lr: 0.0025      # Balanced feature learning
-    opacity_lr: 0.05        # Moderate opacity learning
-    scaling_lr: 0.002       # Conservative scaling
-    rotation_lr: 0.001      # Balanced rotation learning
-    
-    # Save more checkpoints for monitoring
     iterations: 60000
-    lambda_dssim: 0.35
-    save_iterations: [3000, 7000, 15000, 30000, 60000]
+    batch_size: 1
 
-# Enable EDGS correlation with reduced memory footprint
+    # Densification - conservative
+    densify_from_iter: 5000
+    densify_until_iter: 15000
+    densify_grad_threshold: 0.001
+    percent_dense: 0.001
+    densification_interval: 1000
+
+    opacity_reset_interval: 5000
+
+    # Learning rates
+    position_lr_init: 0.00016
+    position_lr_final: 0.0000016
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 50000
+
+    feature_lr: 0.0025
+    opacity_lr: 0.05
+    scaling_lr: 0.003
+    rotation_lr: 0.001
+
+    lambda_dssim: 0.35
+    save_iterations: [10000, 20000, 40000, 60000]
+
 init_wC:
-  use: True                    # Enable EDGS correlation (main advantage!)
-  add_SfM_init: True          # Keep SfM initialization
-  matches_per_ref: 6000       # Reduced from 10000 to save memory
-  num_refs: 120               # Reduced from 180 to save memory
-  nns_per_ref: 2              # Reduced from 3 to save memory
-  scaling_factor: 0.002       # Slightly increased for better matching
-  proj_err_tolerance: 0.02    # Slightly relaxed for more matches
+  use: True
+  add_SfM_init: True
+  matches_per_ref: 6000
+  num_refs: 120
+  nns_per_ref: 2
+  scaling_factor: 0.001
+  proj_err_tolerance: 0.02

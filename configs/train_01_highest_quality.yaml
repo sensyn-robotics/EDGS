@@ -2,57 +2,49 @@ defaults:
   - train
   - _self_
 
-# HIGHEST QUALITY configuration for EDGS ⭐⭐⭐⭐⭐
-# Optimized for NVIDIA A100 GPU maximum capability
-# Extended training with best parameters for PSNR improvement
+# HIGHEST QUALITY ⭐⭐⭐⭐⭐
+# Target: A100 GPU (40-80GB VRAM)
 
-# EDGS core principle - no densification, rely on better initialization
 train:
-  no_densify: False  # Enable densification for maximum quality with dense init
-  gs_epochs: 150000  # Extended training for maximum quality
-  reduce_opacity: True  # Enable opacity reduction for cleanup
-  max_lr: True      # Use max learning rate schedule
+  no_densify: False
+  gs_epochs: 150000
+  reduce_opacity: True
+  max_lr: True
 
-# High-quality Gaussian Splatting optimization settings
 gs:
-  sh_degree: 3  # Maximum spherical harmonics degree for best quality
+  sh_degree: 3
   opt:
-    # Standard batch size to avoid memory issues
-    batch_size: 8  #  Larger batch helps with outdoor scenes with varying lighting.
-    
-    # Opacity reset for removing low-contribution gaussians
-    opacity_reset_interval: 1000  # Regular cleanup for quality
-    
-    # Fine-tuned learning rates for optimal convergence
-    position_lr_init: 0.00016      # Conservative start for stability
-    position_lr_final: 0.00000016   # Very low final for fine details
-    position_lr_delay_mult: 0.01
-    position_lr_max_steps: 120000   # Extended schedule for 150k iterations
-    
-    # Carefully tuned learning rates
-    feature_lr: 0.0025     # Standard rate for features
-    opacity_lr: 0.025       # slower opacity learning
-    scaling_lr: 0.003      # Conservative scaling updates
-    rotation_lr: 0.001     # Standard rotation learning
-    
-    # Loss weighting for better structural quality
-    lambda_dssim: 0.4
-    densify_until_iter: 45000
-    
-    # Save checkpoints for evaluation
-    save_iterations: [30000, 60000, 90000, 120000, 150000]
-    
-    # Exposure compensation for lighting variations
-    exposure_lr_init: 0.01
-    exposure_lr_final: 0.0001
+    iterations: 150000
+    batch_size: 12
 
-# Maximum quality EDGS initialization
+    # Densification
+    densify_from_iter: 500
+    densify_until_iter: 45000
+    densify_grad_threshold: 0.0002
+    percent_dense: 0.01
+    densification_interval: 100
+
+    opacity_reset_interval: 1000
+
+    # Learning rates
+    position_lr_init: 0.00032
+    position_lr_final: 0.0000001
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 120000
+
+    feature_lr: 0.0045
+    opacity_lr: 0.09
+    scaling_lr: 0.005
+    rotation_lr: 0.002
+
+    lambda_dssim: 0.4
+    save_iterations: [30000, 60000, 90000, 120000, 150000]
+
 init_wC:
-  use: True  # Enable EDGS correlation-based initialization
+  use: True
+  add_SfM_init: True
   matches_per_ref: 20000
   num_refs: 240
-  nns_per_ref: 5           # Safe on A100, 10 causes OOM
-  scaling_factor: 0.001   # larger initial gaussian size
-  proj_err_tolerance: 0.01  # same with default projection error for quality
-  roma_model: "outdoors"   # Use appropriate model (change to "indoors" if needed)
-  add_SfM_init: True       # Include SfM points for comprehensive initialization
+  nns_per_ref: 5
+  scaling_factor: 0.001
+  proj_err_tolerance: 0.005

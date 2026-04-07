@@ -2,46 +2,39 @@ defaults:
   - train
   - _self_
 
-# LOWEST QUALITY configuration for EDGS ⭐
-# Absolute minimum settings for very limited GPU memory (4-8GB)
-# Basic reconstruction with minimal memory usage
+# LOWEST QUALITY ⭐
+# Target: 4-8GB GPUs, SfM-only init, minimal settings
 
-# EDGS core with absolute minimal memory
 train:
-  no_densify: True  # Essential EDGS principle - no densification
-  gs_epochs: 30000  # Standard iterations for proper convergence
-  reduce_opacity: True  # Enable opacity reduction
-  max_lr: True  # Use max learning rate for faster convergence
+  no_densify: True
+  gs_epochs: 30000
+  reduce_opacity: True
+  max_lr: True
 
-# Extreme memory reduction settings
 gs:
-  sh_degree: 0  # Minimal SH (only DC) for maximum memory savings
+  sh_degree: 0
   dataset:
-    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
+    data_device: cpu
   opt:
-    # Absolute minimal batch size
-    batch_size: 1  # Ultimate reduction for RTX 4080 Laptop
-    
-    # Disable opacity reset completely
-    opacity_reset_interval: 10_000_000  # Effectively disabled
-    
-    # Very conservative learning rates for tiny batches
-    position_lr_init: 0.00008      # Very low for stability
-    position_lr_final: 0.0000008   # Proportionally lower
-    position_lr_delay_mult: 0.01
     iterations: 30000
-    lambda_dssim: 0.3
-    position_lr_max_steps: 30000
-    
-    # Minimal learning rates for stability
-    feature_lr: 0.001     # Very conservative
-    opacity_lr: 0.01      # Minimal opacity learning
-    scaling_lr: 0.002     # Very reduced scaling
-    rotation_lr: 0.0005   # Minimal rotation learning
+    batch_size: 1
 
-# SfM-only initialization to avoid RoMa OOM  
+    opacity_reset_interval: 10_000_000  # Effectively disabled
+
+    # Learning rates
+    position_lr_init: 0.00008
+    position_lr_final: 0.000008
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
+
+    feature_lr: 0.001
+    opacity_lr: 0.01
+    scaling_lr: 0.001
+    rotation_lr: 0.0005
+
+    lambda_dssim: 0.3
+    save_iterations: [7000, 15000, 30000]
+
 init_wC:
-  use: False  # Disable EDGS correlation initialization (avoids RoMa OOM)
-  add_SfM_init: True  # Use SfM points for meaningful reconstruction
-  matches_per_ref: 2000  # Very reduced matches to save memory
-  num_refs: 30  # Very reduced refs to save memory
+  use: False
+  add_SfM_init: True

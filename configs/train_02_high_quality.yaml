@@ -2,57 +2,49 @@ defaults:
   - train
   - _self_
 
-# HIGH QUALITY configuration for EDGS ⭐⭐⭐⭐
-# Extended training with progressive densification for excellent quality
-# Optimized for 12-16GB GPUs (RTX 4080, RTX 3080 Ti, etc.)
+# HIGH QUALITY ⭐⭐⭐⭐
+# Target: 16GB+ GPUs (RTX 4090, etc.)
 
-# EDGS core settings for progressive training
 train:
-  no_densify: False  # Enable densification for enhanced quality
-  gs_epochs: 100000  # Much longer training for better convergence
+  no_densify: False
+  gs_epochs: 100000
   reduce_opacity: True
   max_lr: True
 
-# Progressive Gaussian Splatting settings
 gs:
-  sh_degree: 1  # Start with SH degree 1, can manually increase later
+  sh_degree: 3
   opt:
-    batch_size: 1
-    
-    # Progressive densification strategy
-    densify_from_iter: 20000     # Start densification later when model is stable
-    densify_until_iter: 40000    # Extended but controlled
-    densify_grad_threshold: 0.0003  # More selective densification
-    percent_dense: 0.001         # Very conservative rate
-    densification_interval: 1000 # Less frequent
-    
-    # More frequent cleanup for quality
-    opacity_reset_interval: 3000
-    
-    # Progressive learning rate schedule
-    position_lr_init: 0.00032      # Higher initial rate
-    position_lr_final: 0.0000001   # Much lower final for fine details
-    position_lr_delay_mult: 0.01
-    position_lr_max_steps: 90000   # Extended schedule
-    
-    # Other optimized rates
-    feature_lr: 0.0040
-    opacity_lr: 0.08
-    scaling_lr: 0.004
-    rotation_lr: 0.002
-    
-    # Progressive checkpoints
-    save_iterations: [20000, 40000, 60000, 80000, 100000]
-    
-    # Quality-focused loss
-    lambda_dssim: 0.4
+    iterations: 100000
+    batch_size: 8
 
-# Conservative EDGS initialization to avoid OOM
+    # Densification
+    densify_from_iter: 1000
+    densify_until_iter: 35000
+    densify_grad_threshold: 0.0003
+    percent_dense: 0.005
+    densification_interval: 200
+
+    opacity_reset_interval: 2000
+
+    # Learning rates
+    position_lr_init: 0.00028
+    position_lr_final: 0.0000003
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 90000
+
+    feature_lr: 0.004
+    opacity_lr: 0.08
+    scaling_lr: 0.0045
+    rotation_lr: 0.0018
+
+    lambda_dssim: 0.4
+    save_iterations: [20000, 40000, 60000, 80000, 100000]
+
 init_wC:
-  use: True  # EDGS correlation initialization
+  use: True
   add_SfM_init: True
-  matches_per_ref: 12000
-  num_refs: 150
+  matches_per_ref: 15000
+  num_refs: 180
   nns_per_ref: 3
-  scaling_factor: 0.0008
+  scaling_factor: 0.001
   proj_err_tolerance: 0.008
