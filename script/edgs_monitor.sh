@@ -13,7 +13,7 @@
 # Options:
 #   --360                   Enable 360 mode
 #   --colmap-config NAME    COLMAP config name (default: colmap_08_360_2fps)
-#   --train-config NAME     Base training config (default: train_large_lowmem)
+#   --train-config NAME     Base training config (default: train_04_medium_quality)
 #   --min-psnr VALUE        Minimum test PSNR (default: 25.0)
 #   --min-ssim VALUE        Minimum test SSIM (default: 0.80)
 #   --max-lpips VALUE       Maximum test LPIPS (default: 0.18)
@@ -31,7 +31,7 @@ shift 2
 
 FLAG_360=""
 COLMAP_CONFIG="colmap_08_360_2fps"
-TRAIN_CONFIG="train_large_lowmem"
+TRAIN_CONFIG="train_04_medium_quality"
 MIN_PSNR=25.0
 MIN_SSIM=0.80
 MAX_LPIPS=0.18

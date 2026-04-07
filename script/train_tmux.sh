@@ -43,7 +43,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-DEFAULT_CONFIG="${USER_CONFIG:-train_large_lowmem}"
+DEFAULT_CONFIG="${USER_CONFIG:-train_04_medium_quality}"
 DEFAULT_COLMAP_CONFIG="${USER_COLMAP_CONFIG:-colmap_08_360_2fps}"
 
 # Validate

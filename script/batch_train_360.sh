@@ -15,7 +15,7 @@ DATA_DIR="${1:?Usage: $0 <data_dir> <output_base_dir>}"
 OUTPUT_BASE="${2:?Usage: $0 <data_dir> <output_base_dir>}"
 
 COLMAP_CONFIG="colmap_08_360_2fps"
-TRAIN_CONFIG="train_large_lowmem"
+TRAIN_CONFIG="train_04_medium_quality"
 MIN_PSNR=25.0
 MIN_SSIM=0.80
 MAX_LPIPS=0.18

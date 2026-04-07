@@ -1,239 +1,119 @@
-# EDGS Training Configuration Guide
+# EDGS Configuration Guide
 
-This directory contains various training configurations for EDGS (Eliminating Densification for Gaussian Splatting), optimized for different GPU memory constraints and quality requirements.
+This directory contains training and COLMAP configurations for EDGS (Eliminating Densification for Gaussian Splatting).
 
-## Configuration Hierarchy
+## Config Structure
 
-The configurations are ranked from **highest to lowest quality/accuracy**:
+```
+configs/
+├── gs/base.yaml              # Base Gaussian Splatting defaults (inherited by all train configs)
+├── train.yaml                # Base EDGS training defaults (inherited by train_01-06)
+├── train_01_highest_quality.yaml  # ⭐⭐⭐⭐⭐ A100 — max quality
+├── train_02_high_quality.yaml     # ⭐⭐⭐⭐   12-16GB — progressive densification
+├── train_03_optimal_quality.yaml  # ⭐⭐⭐     12-16GB — balanced
+├── train_04_medium_quality.yaml   # ⭐⭐⭐     8-12GB — memory-conscious
+├── train_05_low_quality.yaml      # ⭐⭐       8-12GB — SfM-only init
+├── train_06_lowest_quality.yaml   # ⭐         4-8GB — minimal
+├── colmap_01_highest_quality.yaml # Original resolution, strictest matching
+├── colmap_02_high_quality.yaml    # 2.5K, high feature count
+├── colmap_03_optimal_quality.yaml # 1080p, COLMAP defaults (default)
+├── colmap_04_medium_quality.yaml  # 1600px, moderate features
+├── colmap_05_low_quality.yaml     # 1024px, reduced features
+├── colmap_06_lowest_quality.yaml  # 1024px, minimal features
+├── colmap_07_360_optimized.yaml   # 360 video, 3fps, 5 perspective views/frame
+└── colmap_08_360_2fps.yaml        # 360 video, 2fps variant
+```
 
-### 1. **train_01_highest_quality.yaml** - Highest Quality ⭐⭐⭐⭐⭐
-- **Target GPU**: 16GB+ VRAM (RTX 4090, RTX 3090, A100, etc.)
-- **Quality**: Absolute best possible reconstruction quality
-- **Settings**:
-  - 60,000 training epochs
-  - Batch size: 64
-  - SH degree: 3 (full spherical harmonics)
-  - Full EDGS correlation initialization
-  - High learning rates for optimal convergence
-- **Memory Usage**: High (~16GB+)
-- **Training Time**: ~3-4 hours
-- **Expected PSNR**: 25-35+
-- **Use when**: Maximum quality is needed and you have high-end hardware
+### Inheritance
 
-### 2. **train_02_high_quality.yaml** - High Quality ⭐⭐⭐⭐
-- **Target GPU**: 12-16GB VRAM (RTX 4080, RTX 3080 Ti, etc.)
-- **Quality**: Extended training with progressive densification
-- **Settings**:
-  - 100,000 training epochs (very long training)
-  - Batch size: 1
-  - SH degree: 1 (memory efficient)
-  - Progressive densification strategy
-  - No EDGS correlation (memory conservative)
-- **Memory Usage**: Medium-high (~12-16GB)
-- **Training Time**: ~3-4 hours
-- **Expected PSNR**: 18-25
-- **Use when**: You want excellent quality with 12-16GB GPU and can wait
+```
+gs/base.yaml  ←  train.yaml  ←  train_01..06.yaml
+```
 
-### 3. **train_03_optimal_quality.yaml** - Optimal Quality ⭐⭐⭐
-- **Target GPU**: 12-16GB VRAM (RTX 4080, RTX 3080 Ti, etc.)
-- **Quality**: Best compromise between quality and training time
-- **Settings**:
-  - 30,000 training epochs
-  - Batch size: 12
-  - SH degree: 3 (full spherical harmonics)
-  - Full EDGS correlation initialization
-  - Optimized learning rates
-- **Memory Usage**: Medium-high (~12-16GB)
-- **Training Time**: ~1.5-2 hours
-- **Expected PSNR**: 22-28
-- **Use when**: You want high quality with reasonable training time
+All numbered train configs inherit from `train.yaml` via Hydra `defaults: [train]`, and `train.yaml` inherits from `gs/base.yaml` via `defaults: [gs: base]`. COLMAP configs are standalone (no inheritance).
 
-### 4. **train_04_medium_quality.yaml** - Medium Quality ⭐⭐⭐
-- **Target GPU**: 8-12GB VRAM (RTX 4070, RTX 3070, RTX 4060 Ti, etc.)
-- **Quality**: Good quality with memory efficiency
-- **Settings**:
-  - 20,000 training epochs
-  - Batch size: 1
-  - SH degree: 1 (reduced spherical harmonics)
-  - Limited densification enabled
-  - EDGS correlation with reduced parameters
-- **Memory Usage**: Medium (~8-12GB)
-- **Training Time**: ~1-1.5 hours
-- **Expected PSNR**: 16-20
-- **Use when**: You need good quality but have limited GPU memory
+## Training Configs
 
-### 5. **train_05_low_quality.yaml** - Low Quality ⭐⭐
-- **Target GPU**: 8-12GB VRAM (RTX 4060, RTX 3060 Ti, RTX 4050, etc.)
-- **Quality**: Acceptable quality with memory-safe settings
-- **Settings**:
-  - 80,000 training epochs (longer training compensates)
-  - Batch size: 1
-  - SH degree: 1 (reduced spherical harmonics)
-  - Controlled densification
-  - SfM-only initialization (no EDGS correlation)
-- **Memory Usage**: Low (~8-12GB)
-- **Training Time**: ~2.5-3 hours
-- **Expected PSNR**: 15-18
-- **Use when**: You have memory constraints but can afford longer training time
+### Key parameters that differ across tiers
 
-### 6. **train_06_lowest_quality.yaml** - Lowest Quality ⭐
-- **Target GPU**: 4-8GB VRAM (RTX 3050, GTX 1660, mobile GPUs, etc.)
-- **Quality**: Basic reconstruction quality
-- **Settings**:
-  - Minimal training epochs
-  - Batch size: 1
-  - SH degree: 0 (DC component only)
-  - No densification
-  - Minimal feature matching
-  - Aggressive memory optimizations
-- **Memory Usage**: Very low (~4-8GB)
-- **Training Time**: ~30-60 minutes
-- **Expected PSNR**: 12-15
-- **Use when**: You have severe memory limitations or need quick results
+| Config | GPU | Epochs | Densify | EDGS Init | matches/ref | num_refs | nns | SH | Batch | SfM Init |
+|--------|-----|--------|---------|-----------|-------------|----------|-----|----|-------|----------|
+| 01 highest | A100 | 150k | Yes | Yes | 20,000 | 240 | 5 | 3 | 8 | Yes |
+| 02 high | 12-16GB | 100k | Yes | Yes | 12,000 | 150 | 3 | 1 | 1 | Yes |
+| 03 optimal | 12-16GB | 90k | Yes | Yes | 15,000 | 180 | 3 | 3 | 12 | No |
+| 04 medium | 8-12GB | 60k | Yes | Yes | 6,000 | 120 | 2 | 1 | 1 | Yes |
+| 05 low | 8-12GB | 45k | No | **No** | — | — | — | 1 | 1 | Yes |
+| 06 lowest | 4-8GB | 30k | No | **No** | — | — | — | 0 | 1 | Yes |
 
-## Usage Examples
+**Notes:**
+- **EDGS Init** (`init_wC.use`): The core EDGS feature — dense initialization from RoMa correspondences. Disabled in 05/06 to avoid OOM on smaller GPUs.
+- **Densify** (`train.no_densify`): Standard 3DGS densification. Disabled in 05/06 for consistent memory usage.
+- **SfM Init** (`init_wC.add_SfM_init`): Include COLMAP sparse points alongside EDGS correlation points.
+- **SH degree**: 0 = DC only (flat color), 1 = basic view-dependence, 3 = full view-dependent effects.
 
-### Running with Different Configurations
+### train.yaml (base config)
+
+The parent config for all numbered tiers. Key defaults:
+- `gs_epochs: 30000`, `no_densify: False`, `matches_per_ref: 20000`, `num_refs: 360`
+- Represents the original EDGS paper configuration
+- Can be used directly via `--config train` but the numbered tiers are preferred
+
+## COLMAP Configs
+
+Control video preprocessing (frame extraction) and COLMAP reconstruction quality.
+
+| Config | Target GPU | FPS | Image Size | SIFT Features | Matching Strictness |
+|--------|-----------|-----|------------|---------------|---------------------|
+| 01 highest | 16GB+ | 3.0 | original (-1) | 16,384 | Strictest |
+| 02 high | 12-16GB | 2.0 | 2560 | 12,288 | High |
+| 03 optimal | 10-12GB | 1.0 | 1920 | 8,192 | COLMAP defaults |
+| 04 medium | 8-10GB | 2.5 | 1600 | 6,144 | Moderate |
+| 05 low | 6-8GB | 2.0 | 1024 | 4,096 | Lenient |
+| 06 lowest | 4-6GB | 1.0 | 1024 | 2,048 | Most lenient |
+| 07 360 | — | 3.0 | 1024 | 8,192 | Standard |
+| 08 360_2fps | — | 2.0 | 1024 | 8,192 | Standard |
+
+**360 configs (07/08):** Specialized for equirectangular video. Convert each frame to 5 perspective views (front, right, back, left, top). Use sequential matching with vocab tree loop closure. Cap at 1000 total images.
+
+## Usage
+
+### Full pipeline (video to 3D model)
 
 ```bash
-# Highest quality (requires 16GB+ GPU) - Best possible results
 python script/fit_model_to_scene_full.py \
-    --input <video.mp4 or image_dir> \
-    --output_path outputs/my_scene_highest \
-    --config train_01_highest_quality \
-    --max_image_size 1920
-
-# High quality (requires 12-16GB GPU) - Extended training
-python script/fit_model_to_scene_full.py \
-    --input <video.mp4 or image_dir> \
-    --output_path outputs/my_scene_high \
-    --config train_02_high_quality \
-    --max_image_size 800
-
-# Optimal quality (requires 12-16GB GPU) - Balanced approach
-python script/fit_model_to_scene_full.py \
-    --input <video.mp4 or image_dir> \
-    --output_path outputs/my_scene_optimal \
+    --input <video.mp4> \
+    --output_path <output_dir> \
     --config train_03_optimal_quality \
-    --max_image_size 1600
-
-# Medium quality (8-12GB GPU) - Good compromise
-python script/fit_model_to_scene_full.py \
-    --input <video.mp4 or image_dir> \
-    --output_path outputs/my_scene_medium \
-    --config train_04_medium_quality \
-    --max_image_size 1024
-
-# Low quality (8-12GB GPU) - Memory safe, long training
-python script/fit_model_to_scene_full.py \
-    --input <video.mp4 or image_dir> \
-    --output_path outputs/my_scene_low \
-    --config train_05_low_quality \
-    --max_image_size 512
-
-# Lowest quality (4-8GB GPU) - Emergency settings
-python script/fit_model_to_scene_full.py \
-    --input <video.mp4 or image_dir> \
-    --output_path outputs/my_scene_lowest \
-    --config train_06_lowest_quality \
-    --max_image_size 256
+    --colmap_config colmap_03_optimal_quality
 ```
 
-### Docker Script Usage
-
-Convenient Docker scripts are available in the `script/` directory:
+### Batch training with tmux
 
 ```bash
-# Use the appropriate script for your hardware and quality needs
-./script/run_docker_01_highest_quality.sh    # 16GB+ GPU - Best possible quality ⭐⭐⭐⭐⭐
-./script/run_docker_02_high_quality.sh       # 12-16GB GPU - Extended training ⭐⭐⭐⭐  
-./script/run_docker_03_optimal_quality.sh    # 12-16GB GPU - Balanced approach ⭐⭐⭐
-./script/run_docker_04_medium_quality.sh     # 8-12GB GPU - Good compromise ⭐⭐⭐
-./script/run_docker_05_low_quality.sh        # 8-12GB GPU - Memory safe ⭐⭐
-./script/run_docker_06_lowest_quality.sh     # 4-8GB GPU - Emergency settings ⭐
+# Single video
+./script/train_tmux.sh --input data/video.mp4 --output_path outputs/scene1 \
+    --config train_03_optimal_quality --colmap_config colmap_03_optimal_quality
+
+# Batch (all videos in a directory), 360 mode
+./script/train_tmux.sh --batch --data_dir data/videos --output_base outputs/batch \
+    --360 --config train_04_medium_quality --colmap_config colmap_08_360_2fps
 ```
 
-## Configuration Parameters Explained
+Default configs for `train_tmux.sh`: `train_04_medium_quality` + `colmap_08_360_2fps`.
 
-### Key Parameters That Affect Quality vs Memory:
+### Training only (COLMAP already done)
 
-- **gs_epochs**: More epochs = better quality but longer training time
-- **batch_size**: Larger batches = better convergence but more memory
-- **sh_degree**: Higher degree = better lighting/color but more memory
-- **max_image_size**: Larger images = better detail but much more memory
-- **EDGS correlation (init_wC.use)**: Better initialization but requires more memory
-- **Densification**: Can improve quality but uses more memory
-
-### Memory vs Quality Trade-offs:
-
-- **SH Degree**: 0 → 1 → 3 (memory increases ~4x each step)
-- **Batch Size**: 1 → 12 → 64 (memory scales linearly)  
-- **Image Resolution**: 256 → 512 → 1024 → 1920 (memory scales quadratically)
-- **EDGS Correlation**: Disabled → Enabled (adds ~2-4GB memory usage)
-
-## Troubleshooting
-
-### CUDA Out of Memory Errors:
-1. Use a lower quality configuration
-2. Reduce `max_image_size` parameter
-3. Close other GPU applications
-4. Restart Docker container to clear GPU memory
-
-### Poor Quality Results:
-1. Use a higher quality configuration if you have enough GPU memory
-2. Increase training epochs
-3. Use larger input images (if memory allows)
-4. Enable EDGS correlation initialization
-
-### Expected Quality Ranges:
-- **High Quality**: PSNR > 18, SSIM > 0.65
-- **Medium Quality**: PSNR > 16, SSIM > 0.55  
-- **Low Memory**: PSNR > 15, SSIM > 0.52
-- **Ultra Low**: PSNR > 12, SSIM > 0.45
-
-## Hardware Recommendations
-
-| GPU Model | VRAM | Recommended Config | Docker Script | Max Image Size |
-|-----------|------|--------------------|---------------|----------------|
-| RTX 4090 | 24GB | train_01_highest_quality | run_docker_01_highest_quality.sh | 1920+ |
-| RTX 4080 | 16GB | train_02_high_quality | run_docker_02_high_quality.sh | 800 |
-| RTX 4080 | 12GB | train_03_optimal_quality | run_docker_03_optimal_quality.sh | 1600 |
-| RTX 4070 Ti | 12GB | train_04_medium_quality | run_docker_04_medium_quality.sh | 1024 |
-| RTX 4070 | 12GB | train_05_low_quality | run_docker_05_low_quality.sh | 800 |
-| RTX 4060 Ti | 16GB | train_03_optimal_quality | run_docker_03_optimal_quality.sh | 1024 |
-| RTX 4060 Ti | 8GB | train_05_low_quality | run_docker_05_low_quality.sh | 512 |
-| RTX 4060 | 8GB | train_06_lowest_quality | run_docker_06_lowest_quality.sh | 256 |
-| RTX 3080 | 10GB | train_05_low_quality | run_docker_05_low_quality.sh | 512 |
-| RTX 3070 | 8GB | train_06_lowest_quality | run_docker_06_lowest_quality.sh | 256 |
-
-## Quick Reference
-
-### For Immediate Use:
 ```bash
-# Best quality (if you have RTX 4090/A100)
-./script/run_docker_01_highest_quality.sh
-
-# Long training approach (RTX 4080, 3080 Ti)  
-./script/run_docker_02_high_quality.sh
-
-# Balanced (RTX 4080, 3080 Ti)
-./script/run_docker_03_optimal_quality.sh
-
-# Conservative (RTX 4070, 3070, 4060 Ti)
-./script/run_docker_04_medium_quality.sh
-
-# Memory safe (RTX 4060, 3060 Ti)
-./script/run_docker_05_low_quality.sh
-
-# Emergency (RTX 3050, mobile GPUs)
-./script/run_docker_06_lowest_quality.sh
+python script/train.py \
+    train.gs_epochs=30000 \
+    train.no_densify=True \
+    gs.dataset.source_path=<colmap_scene> \
+    gs.dataset.model_path=<output_dir>
 ```
 
-### Quality Expectations:
-- **⭐⭐⭐⭐⭐ Highest**: PSNR 25-35+ (publication quality)
-- **⭐⭐⭐⭐ High**: PSNR 18-25 (excellent quality)  
-- **⭐⭐⭐ Optimal/Medium**: PSNR 16-22 (very good quality)
-- **⭐⭐ Low**: PSNR 15-18 (acceptable quality)
-- **⭐ Lowest**: PSNR 12-15 (basic reconstruction)
+## Tips
 
-Choose the configuration that matches your hardware capabilities and quality requirements!
+- **GPU memory during EDGS init:** The RoMa matcher is the peak memory consumer. Reduce `matches_per_ref`, `num_refs`, or `nns_per_ref` if you hit OOM during initialization.
+- **GPU memory during training:** Reduce `batch_size`, `sh_degree`, or use `gs.dataset.data_device=cpu` to keep images on CPU.
+- **COLMAP image size vs training image size:** COLMAP `max_image_size` controls reconstruction resolution. Training uses `gs.dataset.resolution` (default: -1 = original). These are independent.
+- **360 video:** Always pair 360 COLMAP configs (07/08) with the `--360` flag in `fit_model_to_scene_full.py` or `train_tmux.sh`.
