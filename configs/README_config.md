@@ -34,21 +34,30 @@ All numbered train configs inherit from `train.yaml` via Hydra `defaults: [train
 
 ## Training Configs
 
+### Initialization: how Gaussians are created
+
+Every config starts with **COLMAP SfM points** — a sparse 3D point cloud from Structure-from-Motion. This is always the baseline.
+
+**EDGS init** (`init_wC.use=True`) adds a second step: RoMa matches dense 2D correspondences across image pairs and triangulates them into thousands of additional 3D Gaussians. This is the core EDGS contribution — enough initial Gaussians that densification becomes unnecessary.
+
+After EDGS init adds its points, `add_SfM_init` controls whether the original SfM points are **kept** (`True`) or **removed** (`False`), leaving only EDGS correspondence points.
+
+When `init_wC.use=False` (configs 05/06), EDGS init is skipped entirely and training starts from SfM points only — equivalent to standard 3DGS.
+
 ### Key parameters that differ across tiers
 
-| Config | GPU | Epochs | Densify | EDGS Init | matches/ref | num_refs | nns | SH | Batch | SfM Init |
-|--------|-----|--------|---------|-----------|-------------|----------|-----|----|-------|----------|
-| 01 highest | A100 | 150k | Yes | Yes | 20,000 | 240 | 5 | 3 | 8 | Yes |
-| 02 high | 12-16GB | 100k | Yes | Yes | 12,000 | 150 | 3 | 1 | 1 | Yes |
-| 03 optimal | 12-16GB | 90k | Yes | Yes | 15,000 | 180 | 3 | 3 | 12 | No |
-| 04 medium | 8-12GB | 60k | Yes | Yes | 6,000 | 120 | 2 | 1 | 1 | Yes |
-| 05 low | 8-12GB | 45k | No | **No** | — | — | — | 1 | 1 | Yes |
-| 06 lowest | 4-8GB | 30k | No | **No** | — | — | — | 0 | 1 | Yes |
+| Config | GPU | Epochs | Densify | Initialization | matches/ref | num_refs | nns | SH | Batch |
+|--------|-----|--------|---------|----------------|-------------|----------|-----|----|-------|
+| 01 highest | A100 | 150k | Yes | EDGS + SfM | 20,000 | 240 | 5 | 3 | 8 |
+| 02 high | 12-16GB | 100k | Yes | EDGS + SfM | 12,000 | 150 | 3 | 1 | 1 |
+| 03 optimal | 12-16GB | 90k | Yes | EDGS only | 15,000 | 180 | 3 | 3 | 12 |
+| 04 medium | 8-12GB | 60k | Yes | EDGS + SfM | 6,000 | 120 | 2 | 1 | 1 |
+| 05 low | 8-12GB | 45k | No | SfM only | — | — | — | 1 | 1 |
+| 06 lowest | 4-8GB | 30k | No | SfM only | — | — | — | 0 | 1 |
 
 **Notes:**
-- **EDGS Init** (`init_wC.use`): The core EDGS feature — dense initialization from RoMa correspondences. Disabled in 05/06 to avoid OOM on smaller GPUs.
-- **Densify** (`train.no_densify`): Standard 3DGS densification. Disabled in 05/06 for consistent memory usage.
-- **SfM Init** (`init_wC.add_SfM_init`): Include COLMAP sparse points alongside EDGS correlation points.
+- **Initialization**: "EDGS + SfM" = dense EDGS points + sparse SfM points. "EDGS only" = dense EDGS points, SfM removed. "SfM only" = EDGS disabled to avoid OOM.
+- **Densify** (`train.no_densify`): Standard 3DGS densification during training. Disabled in 05/06 for consistent memory usage.
 - **SH degree**: 0 = DC only (flat color), 1 = basic view-dependence, 3 = full view-dependent effects.
 
 ### train.yaml (base config)
