@@ -553,6 +553,22 @@ def main():
     print(f"📦 EDGS output: {model_path}")
     os.makedirs(model_path, exist_ok=True)
 
+    # Write cfg_args for SIBR viewer compatibility
+    with open(os.path.join(model_path, "cfg_args"), "w") as cfg_log_f:
+        params = {
+            "sh_degree": cfg.gs.get("sh_degree", 3),
+            "source_path": cfg.gs.dataset.source_path,
+            "model_path": model_path,
+            "images": cfg.gs.dataset.images,
+            "depths": "",
+            "resolution": -1,
+            "_white_background": cfg.gs.dataset.white_background,
+            "train_test_exp": False,
+            "data_device": cfg.gs.dataset.get("data_device", "cuda"),
+            "eval": False,
+        }
+        cfg_log_f.write(str(argparse.Namespace(**params)))
+
     # Check if EDGS training has already completed
     if check_edgs_training_complete(model_path):
         print("\n✅ EDGS training already completed!")

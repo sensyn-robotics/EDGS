@@ -36,7 +36,7 @@ def main(cfg: omegaconf.DictConfig):
     os.makedirs(cfg.gs.dataset.model_path, exist_ok=True)
     with open(os.path.join(cfg.gs.dataset.model_path, "cfg_args"), "w") as cfg_log_f:
         params = {
-            "sh_degree": 3,
+            "sh_degree": cfg.gs.sh_degree,
             "source_path": cfg.gs.dataset.source_path,
             "model_path": cfg.gs.dataset.model_path,
             "images": cfg.gs.dataset.images,
