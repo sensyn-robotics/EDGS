@@ -607,12 +607,13 @@ def main():
         num_points = len(plydata['vertex'])
         if num_points > MAX_INIT_POINTS:
             print(f"⚠️  COLMAP point cloud has {num_points:,} points (limit: {MAX_INIT_POINTS:,})")
-            indices = np.random.default_rng(42).choice(num_points, MAX_INIT_POINTS, replace=False)
-            plydata['vertex'] = plydata['vertex'][sorted(indices)]
+            indices = sorted(np.random.default_rng(42).choice(num_points, MAX_INIT_POINTS, replace=False))
+            from plyfile import PlyElement
+            subsampled = PlyData([PlyElement.describe(plydata['vertex'].data[indices], 'vertex')])
             backup_path = ply_path + ".full"
             if not os.path.exists(backup_path):
                 os.rename(ply_path, backup_path)
-            plydata.write(ply_path)
+            subsampled.write(ply_path)
             print(f"   Subsampled to {MAX_INIT_POINTS:,} points (original backed up to points3D.ply.full)")
 
     # Initialize Gaussian Splatting model
