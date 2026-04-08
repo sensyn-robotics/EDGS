@@ -101,8 +101,8 @@ From command line - Complete command with all possible arguments:
 docker compose exec edgs-app python script/fit_model_to_scene_full.py \
     --input <input>                       # Path to input: COLMAP scene, image directory, video directory, or video file \
     --360                                 # Enable 360° equirectangular video processing (optional) \
-    --colmap_config <colmap_preset>       # COLMAP preset (01=highest to 06=lowest quality) \
-    --config <config_name>                # Training config (01=highest to 06=lowest quality) \
+    --colmap_config colmap_03_optimal_quality  # COLMAP preset (see list below) \
+    --config train_03_optimal_quality         # Training config (see list below) \
     --output_path <output_dir>            # Where to save EDGS model (optional)
 ```
 
