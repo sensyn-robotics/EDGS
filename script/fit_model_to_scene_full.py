@@ -592,6 +592,29 @@ def main():
     # Setup CUDA
     setup_cuda()
 
+    # Cap initial point cloud to avoid OOM from dense COLMAP reconstructions (e.g. LiDAR)
+    # Each Gaussian needs ~944 bytes on GPU (59 params × 4 bytes × 4 for params+optimizer+grads)
+    # Reserve 2GB for rendering, PyTorch overhead, and EDGS init points
+    try:
+        vram_bytes = torch.cuda.get_device_properties(0).total_mem
+        MAX_INIT_POINTS = int((vram_bytes - 2 * 1024**3) / 944)
+    except Exception:
+        MAX_INIT_POINTS = 500_000
+    ply_path = os.path.join(scene_dir, "sparse", "0", "points3D.ply")
+    if os.path.exists(ply_path):
+        from plyfile import PlyData
+        plydata = PlyData.read(ply_path)
+        num_points = len(plydata['vertex'])
+        if num_points > MAX_INIT_POINTS:
+            print(f"⚠️  COLMAP point cloud has {num_points:,} points (limit: {MAX_INIT_POINTS:,})")
+            indices = np.random.default_rng(42).choice(num_points, MAX_INIT_POINTS, replace=False)
+            plydata['vertex'] = plydata['vertex'][sorted(indices)]
+            backup_path = ply_path + ".full"
+            if not os.path.exists(backup_path):
+                os.rename(ply_path, backup_path)
+            plydata.write(ply_path)
+            print(f"   Subsampled to {MAX_INIT_POINTS:,} points (original backed up to points3D.ply.full)")
+
     # Initialize Gaussian Splatting model
     try:
         gs = hydra.utils.instantiate(cfg.gs)

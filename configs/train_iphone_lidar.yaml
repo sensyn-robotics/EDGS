@@ -2,50 +2,51 @@ defaults:
   - train
   - _self_
 
-# OPTIMAL QUALITY configuration for EDGS ⭐⭐⭐
-# Balanced performance with good quality for 12-16GB GPUs
-# Best compromise between quality and training time
+# OPTIMAL QUALITY ⭐⭐⭐
+# Target: 12-16GB GPUs
 
-# EDGS core settings
 train:
-  no_densify: True  # Enable densification for optimal quality
-  gs_epochs: 30000  # Full training iterations
-  reduce_opacity: True
+  no_densify: True
+  gs_epochs: 30000
+  reduce_opacity: False  # Disable so early checkpoints have visible opacity
   max_lr: True
 
-# Gaussian Splatting optimization
 gs:
+  sh_degree: 3
   dataset:
-    data_device: cpu  # Keep images on CPU to avoid OOM with large image sets
+    data_device: cpu
   opt:
     iterations: 30000
-    densify_until_iter: 30000
-    lambda_dssim: 0.4
-    save_iterations: [3000, 7000, 15000, 30000]
+    batch_size: 1
 
-    # Optimal batch size for quality
-    batch_size: 12
-    
-    # Regular opacity reset for quality
-    opacity_reset_interval: 8000
-    
-    # Optimal learning rates
-    position_lr_init: 0.00032
-    position_lr_final: 0.0000032
+    # Densification
+    densify_from_iter: 2000
+    densify_until_iter: 25000
+    densify_grad_threshold: 0.0005
+    percent_dense: 0.003
+    densification_interval: 500
+
+    opacity_reset_interval: 10000  # Push late so early saves are viewable
+
+    # Learning rates
+    position_lr_init: 0.00024
+    position_lr_final: 0.000001
     position_lr_delay_mult: 0.01
-    position_lr_max_steps: 90000
-    
-    feature_lr: 0.0045
-    opacity_lr: 0.09
-    scaling_lr: 0.004
-    rotation_lr: 0.002
+    position_lr_max_steps: 80000
 
-# Full EDGS initialization
+    feature_lr: 0.0035
+    opacity_lr: 0.07
+    scaling_lr: 0.004
+    rotation_lr: 0.0015
+
+    lambda_dssim: 0.4
+    save_iterations: [500, 1500, 3000, 6000, 15000, 30000]
+
 init_wC:
-  use: True  # Use EDGS correlation initialization
-  matches_per_ref: 15000
-  num_refs: 180
+  use: True
+  add_SfM_init: False  # Remove 15.5M SfM points — EDGS provides dense init
+  matches_per_ref: 12000
+  num_refs: 150
   nns_per_ref: 3
-  scaling_factor: 0.0005
-  proj_err_tolerance: 0.005
-  add_SfM_init: True
+  scaling_factor: 0.001
+  proj_err_tolerance: 0.01
