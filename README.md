@@ -38,6 +38,7 @@ Renderings become <strong>nearly indistinguishable from ground truth after only 
 ## 📚 Table of Contents
 - [🚀 Quickstart](#sec-quickstart)
 - [🛠️ Installation](#sec-install)
+- [📂 Directory Structure](#sec-structure)
 - [📦 Data](#sec-data)
 - [🎬 Video Processing Improvements](#video-processing-improvements)
 - [🏋️ Training](#sec-training)
@@ -75,6 +76,58 @@ docker compose up -d
 
 # Or manual installation
 bash script/install.sh
+```
+
+<a id="sec-structure"></a>
+## 📂 Directory Structure
+
+```
+EDGS/
+├── assets/                  # Images and media for README
+├── configs/                 # Hydra configuration files
+│   ├── gs/
+│   │   └── base.yaml        # Base Gaussian Splatting parameters
+│   ├── colmap_*.yaml        # COLMAP reconstruction presets (01=highest to 06=lowest quality)
+│   ├── train_*.yaml         # Training presets by GPU memory (01=highest to 06=lowest quality)
+│   └── train.yaml           # Default training configuration
+├── data/                    # Input datasets (mounted into Docker container)
+├── examples/                # Example scripts demonstrating source module usage
+├── model/                   # Pretrained model weights
+│   ├── checkpoints/
+│   │   └── vgg16-397923af.pth   # VGG16 weights for perceptual loss
+│   ├── roma_outdoor.pth         # RoMa matcher weights
+│   └── dinov2_vitl14_pretrain.pth  # DINOv2 backbone weights
+├── notebooks/               # Jupyter notebooks
+│   └── fit_model_to_scene_full.ipynb  # End-to-end pipeline notebook (also on Colab)
+├── outputs/                 # Training outputs and reconstructed models
+├── script/                  # Executable scripts
+│   ├── fit_model_to_scene_full.py  # End-to-end pipeline: video/images → 3D model
+│   ├── train.py             # Core training script
+│   ├── train_tmux.sh        # Batch training with tmux session management
+│   ├── gradio_demo.py       # Interactive web interface
+│   ├── full_eval.py         # Evaluation on benchmark datasets
+│   ├── quick_eval.py        # Quick PSNR/SSIM/LPIPS evaluation
+│   ├── render_depth.py      # Depth image rendering from trained models
+│   ├── tree_diameter_estimator.py  # Tree trunk diameter estimation tool
+│   ├── install.sh           # Manual installation script
+│   └── docker-compose-devcontainer.sh  # Docker helper for VS Code Dev Containers
+├── source/                  # Core library source code
+│   ├── trainer.py           # EDGSTrainer: main training orchestration
+│   ├── corr_init.py         # Dense initialization from 2D correspondences (RoMa)
+│   ├── process_video_to_colmap_scene.py  # Video → COLMAP scene conversion
+│   ├── convert_equirectangular_to_cubemap.py  # 360° video processing
+│   ├── networks.py          # Neural networks for exposure compensation
+│   ├── losses.py            # Custom loss functions (L1, SSIM, perceptual)
+│   ├── visualization.py     # Rendering and visualization utilities
+│   ├── utils_preprocess.py  # Video/image preprocessing utilities
+│   ├── utils_video.py       # Video I/O and frame extraction
+│   └── data_utils.py        # Dataset loading utilities
+├── submodules/              # Git submodules
+│   ├── gaussian-splatting/  # Base 3DGS implementation
+│   └── RoMa/               # Robust matcher for correspondence extraction
+├── docker-compose.yml       # Docker container configuration
+├── Dockerfile               # Docker image definition
+└── pyproject.toml           # Python project metadata and dependencies
 ```
 
 <a id="sec-data"></a>
