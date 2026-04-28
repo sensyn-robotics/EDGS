@@ -66,7 +66,7 @@ class EDGSTrainer:
     def load_checkpoints(self, load_cfg):
         # Load 3DGS checkpoint
         if load_cfg.gs:
-            self.gs.gaussians.restore(
+            self.GS.gaussians.restore(
                 torch.load(f"{load_cfg.gs}/chkpnt{load_cfg.gs_step}.pth")[0],
                 self.training_config)
             self.GS_optimizer = self.GS.gaussians.optimizer
