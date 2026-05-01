@@ -5,8 +5,12 @@ defaults:
 # iPhone LiDAR scene — dense ~600k-point init covers geometry but is too sparse
 # for fine detail. Three-phase schedule:
 #   0–10000  warm-up:  refine LiDAR init (no densify, opacity-prune only)
-#   10000–25000 densify: split/clone high-grad gaussians, recycle blocked ones
+#   10000–25000 densify: split/clone high-grad gaussians, prune below min_opacity
 #   25000–30000 fine-tune: population frozen, refine remaining gaussians
+# Opacity reset is disabled (interval >> total iters) — slamming every gaussian
+# to opacity≈0 and rebuilding kills good LiDAR init points faster than densify
+# can replace them. Verified empirically: with reset @ 3000 the run lost ~3 dB
+# train PSNR vs the no_densify baseline.
 
 train:
   no_densify: False      # enable densification (gated by densify_from_iter / densify_until_iter)
@@ -26,7 +30,7 @@ gs:
     densify_until_iter: 25000     # last 5k iters frozen for fine-tuning
     densification_interval: 100
     densify_grad_threshold: 0.0002
-    opacity_reset_interval: 3000  # recycle blocked gaussians ~5x during densify phase
+    opacity_reset_interval: 100000  # effectively never — preserve LiDAR init opacities
 
     position_lr_init: 0.00016
     position_lr_final: 0.0000016
