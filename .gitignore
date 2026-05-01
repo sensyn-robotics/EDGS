@@ -163,4 +163,3 @@ learnableearthparser/fast_sampler/_sampler.c
 
 # data
 data/
-configs/train_iphone_lidar.yaml

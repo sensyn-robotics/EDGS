@@ -1,0 +1,52 @@
+defaults:
+  - train
+  - _self_
+
+# iPhone LiDAR scene — dense ~600k-point init covers geometry but is too sparse
+# for fine detail. Three-phase schedule:
+#   0–10000  warm-up:  refine LiDAR init (no densify, opacity-prune only)
+#   10000–25000 densify: split/clone high-grad gaussians, recycle blocked ones
+#   25000–30000 fine-tune: population frozen, refine remaining gaussians
+
+train:
+  no_densify: False      # enable densification (gated by densify_from_iter / densify_until_iter)
+  reduce_opacity: False  # do NOT decay opacity every 10 steps — it kills good LiDAR points
+  max_lr: False          # enable proper position-LR warmup
+  gs_epochs: 30000
+
+gs:
+  sh_degree: 3
+  dataset:
+    data_device: cpu
+  opt:
+    iterations: 30000
+    batch_size: 1
+
+    densify_from_iter: 10000      # warm-up window before densification
+    densify_until_iter: 25000     # last 5k iters frozen for fine-tuning
+    densification_interval: 100
+    densify_grad_threshold: 0.0002
+    opacity_reset_interval: 3000  # recycle blocked gaussians ~5x during densify phase
+
+    position_lr_init: 0.00016
+    position_lr_final: 0.0000016
+    position_lr_delay_mult: 0.01
+    position_lr_max_steps: 30000
+
+    feature_lr: 0.0025
+    opacity_lr: 0.05
+    scaling_lr: 0.005
+    rotation_lr: 0.001
+
+    lambda_dssim: 0.2
+    save_iterations: [10000, 15000, 20000, 25000, 30000]
+
+init_wC:
+  use: True
+  add_SfM_init: True       # keep LiDAR points
+  matches_per_ref: 2000    # small correspondence set — LiDAR should dominate
+  num_refs: 30
+  nns_per_ref: 1
+  scaling_factor: 0.005    # 5 mm per meter depth — not sub-mm
+  proj_err_tolerance: 0.01
+  roma_model: "indoors"
