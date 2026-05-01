@@ -1,0 +1,8 @@
+FROM edgs-app:latest
+
+USER root
+COPY configs/ /EDGS/configs/
+COPY source/ /EDGS/source/
+COPY script/ /EDGS/script/
+RUN chown -R claude_user:claude_user /EDGS/configs /EDGS/source /EDGS/script
+USER claude_user
