@@ -54,13 +54,18 @@ RUN conda create -y -n edgs python=3.10 pip && \
 # Set CUDA architectures to compile for
 ENV TORCH_CUDA_ARCH_LIST="7.5;8.0;8.6;8.9;9.0+PTX"
 
-# Activate the environment and install Python dependencies
+# Activate the environment and install Python dependencies.
+# The --no-build-isolation flag on editable installs makes pip's PEP-517
+# build step reuse the env's torch — diff-gaussian-rasterization's setup.py
+# imports torch.utils.cpp_extension at build time, which an isolated env
+# doesn't have.
 RUN /bin/bash -c "source activate edgs && \
   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121 && \
-  pip install -e ./submodules/gaussian-splatting/submodules/diff-gaussian-rasterization && \
-  pip install -e ./submodules/gaussian-splatting/submodules/simple-knn && \
+  pip install setuptools wheel && \
+  pip install --no-build-isolation -e ./submodules/gaussian-splatting/submodules/diff-gaussian-rasterization && \
+  pip install --no-build-isolation -e ./submodules/gaussian-splatting/submodules/simple-knn && \
   pip install pycolmap wandb hydra-core tqdm torchmetrics lpips matplotlib rich plyfile imageio imageio-ffmpeg opencv-python && \
-  pip install -e ./submodules/RoMa && \
+  pip install --no-build-isolation -e ./submodules/RoMa && \
   pip install gradio plotly scikit-learn moviepy==2.1.1 ffmpeg open3d jupyterlab matplotlib"
 
 # Install Claude Code CLI
